@@ -1,0 +1,10 @@
+body { background-color: #f4f6f9; font-family: 'Segoe UI', sans-serif; }
+.navbar { background-color: #004a98; padding: 1rem; }
+.navbar-brand { font-weight: 600; }
+.card-header { font-weight: 600; color: #004a98; border-bottom: 2px solid #f0f0f0; }
+.kpi-card:hover { transform: translateY(-2px); }
+.badge-pendiente { background-color: #ffc107; color: #000; }
+.badge-validado { background-color: #28a745; color: #fff; }
+.badge-rechazado, .badge-incumplido { background-color: #dc3545; color: #fff; }
+.btn-primary { background-color: #004a98; border-color: #004a98; }
+.btn-primary:hover { background-color: #003366; }
