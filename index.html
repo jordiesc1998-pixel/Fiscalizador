@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GAD - Sistema de Mantenimiento</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark shadow-sm">
+        <div class="container">
+            <a class="navbar-brand" href="#"><i class="bi bi-gear-wide-connected"></i> GAD En Línea - Mantenimiento</a>
+            <div class="d-flex" id="navContent"></div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Login -->
+        <div id="loginScreen" class="row justify-content-center mt-5">
+            <div class="col-md-5">
+                <div class="card border-0 shadow-lg">
+                    <div class="card-header bg-transparent text-center p-4"><h4 class="mb-0">Control de Acceso</h4></div>
+                    <div class="card-body p-4">
+                        <div id="loginError" class="alert alert-danger d-none"></div>
+                        <form id="loginForm">
+                            <div class="mb-3"><label class="form-label">Correo Electrónico</label><input type="email" id="loginEmail" class="form-control" required></div>
+                            <div class="mb-3"><label class="form-label">Contraseña</label><input type="password" id="loginPass" class="form-control" required></div>
+                            <button type="submit" class="btn btn-primary w-100 py-2">Ingresar</button>
+                        </form>
+                        <div class="mt-3 text-center text-muted small">Usuarios: <b>inspector@gad.com</b> / <b>tecnico@gad.com</b> (Pass: 12345)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel Técnico -->
+        <div id="tecnicoPanel" class="d-none">
+            <div class="row">
+                <div class="col-lg-4">
+                    <div class="card mb-4 border-0 shadow-sm">
+                        <div class="card-header"><i class="bi bi-building me-2"></i>Crear Establecimiento</div>
+                        <div class="card-body">
+                            <form id="formEstablecimiento">
+                                <div class="mb-3"><label>Nombre del Lugar</label><input type="text" id="estName" class="form-control" required></div>
+                                <div class="mb-3"><label>Dirección</label><input type="text" id="estDir" class="form-control"></div>
+                                <div class="mb-3"><label>Estructuras</label><textarea id="estStruct" class="form-control" rows="2"></textarea></div>
+                                <button type="submit" class="btn btn-success w-100"><i class="bi bi-plus-circle me-1"></i> Guardar</button>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header"><i class="bi bi-clipboard-check me-2"></i>Asignar Actividad</div>
+                        <div class="card-body">
+                            <form id="formActividad">
+                                <div class="mb-3"><label>Establecimiento</label><select id="actEst" class="form-select" required></select></div>
+                                <div class="mb-3"><label>Actividad</label><input type="text" id="actName" class="form-control" required></div>
+                                <div class="mb-3"><label>Frecuencia</label>
+                                    <select id="actFreq" class="form-select">
+                                        <option value="diaria">Diaria (Check)</option>
+                                        <option value="mensual">Mensual (Foto)</option>
+                                        <option value="anual">Anual (Foto)</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100">Programar</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-8">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white"><i class="bi bi-list-check me-2"></i>Pendientes de Hoy <span class="badge bg-primary" id="dateToday"></span></div>
+                        <div class="card-body" id="listaTareasTecnico"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel Inspector -->
+        <div id="inspectorPanel" class="d-none">
+            <div class="row mb-4">
+                <div class="col-md-3"><div class="card kpi-card border-0 shadow-sm bg-success text-white"><div class="card-body text-center"><h2 id="kpiCumplimiento">0%</h2><small>Cumplimiento</small></div></div></div>
+                <div class="col-md-3"><div class="card kpi-card border-0 shadow-sm"><div class="card-body text-center"><h2 id="kpiTotal">0</h2><small>Total Tareas</small></div></div></div>
+                <div class="col-md-3"><div class="card kpi-card border-0 shadow-sm bg-warning"><div class="card-body text-center"><h2 id="kpiPendientes">0</h2><small>Por Revisar</small></div></div></div>
+                <div class="col-md-3"><div class="card kpi-card border-0 shadow-sm bg-danger text-white"><div class="card-body text-center"><h2 id="kpiIncumplidas">0</h2><small>Incumplidas</small></div></div></div>
+            </div>
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white"><i class="bi bi-table me-2"></i>Reporte General</div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light"><tr><th>Fecha</th><th>Establecimiento</th><th>Actividad</th><th>Técnico</th><th>Estado</th><th>Acciones</th></tr></thead>
+                            <tbody id="tablaInspector"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
