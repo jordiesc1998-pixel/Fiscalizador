@@ -10,7 +10,7 @@ const initDB = () => {
         localStorage.setItem('usuarios', JSON.stringify(usuarios));
     }
     if (!localStorage.getItem('establecimientos')) localStorage.setItem('establecimientos', '[]');
-    if (!localStorage.getItem('estructuras')) localStorage.setItem('estructuras', '[]'); // Nueva tabla
+    if (!localStorage.getItem('estructuras')) localStorage.setItem('estructuras', '[]'); 
     if (!localStorage.getItem('actividades') ) localStorage.setItem('actividades', '[]');
     if (!localStorage.getItem('registros')) localStorage.setItem('registros', '[]');
 };
@@ -37,12 +37,10 @@ const logout = () => { localStorage.removeItem('sessionUser'); location.reload()
 // ==========================================
 // TÉCNICO - LÓGICA
 // ==========================================
-
-// 1. Crear Establecimiento (con Propietario y CI)
 const crearEstablecimiento = (e) => {
     e.preventDefault();
     const ests = getDB('establecimientos');
-    const newEst = {
+    ests.push({
         id: Date.now(),
         nombre: document.getElementById('estName').value,
         direccion: document.getElementById('estDir').value,
@@ -50,15 +48,13 @@ const crearEstablecimiento = (e) => {
         ci_ruc: document.getElementById('estCi').value,
         usuario_id: currentUser.id,
         usuario_nombre: currentUser.nombre
-    };
-    ests.push(newEst);
+    });
     setDB('establecimientos', ests);
     alert('✅ Establecimiento creado.');
     e.target.reset();
     actualizarSelectsTecnico();
 };
 
-// 2. Crear Estructura Física (con Foto)
 const crearEstructura = (e) => {
     e.preventDefault();
     const estId = parseInt(document.getElementById('structEstSelect').value);
@@ -77,13 +73,12 @@ const crearEstructura = (e) => {
     alert(`✅ Estructura "${nombre}" agregada.`);
     e.target.reset();
     actualizarSelectsTecnico();
-    renderListaEstructuras(); // Mostrar lista visual
+    renderListaEstructuras();
 };
 
-// 3. Crear Actividad
 const crearActividad = (e) => {
     e.preventDefault();
-    const structId = parseInt(document.getElementById('actStructName').value); // Ahora es ID
+    const structId = parseInt(document.getElementById('actStructName').value);
     const structObj = getDB('estructuras').find(s => s.id === structId);
     
     const acts = getDB('actividades');
@@ -102,52 +97,32 @@ const crearActividad = (e) => {
     renderTecnicoTareas();
 };
 
-// Actualizar todos los Selects
 const actualizarSelectsTecnico = () => {
     const ests = getDB('establecimientos').filter(e => e.usuario_id === currentUser.id);
-    
-    // Select de "Agregar Estructura"
     const selectEstStruct = document.getElementById('structEstSelect');
     selectEstStruct.innerHTML = ests.map(e => `<option value="${e.id}">${e.nombre}</option>`).join('');
 
-    // Select de "Crear Actividad - Establecimiento"
     const selectActEst = document.getElementById('actEst');
     selectActEst.innerHTML = ests.map(e => `<option value="${e.id}">${e.nombre}</option>`).join('');
     
-    // Trigger para cargar estructuras cuando se cambia el establecimiento en el form de actividad
     selectActEst.onchange = () => cargarEstructurasDropdown(selectActEst.value);
-    if(ests.length > 0) cargarEstructurasDropdown(ests[0].id); // Cargar el primero por defecto
+    if(ests.length > 0) cargarEstructurasDropdown(ests[0].id);
 };
 
-// Llenar el Dropdown de Estructuras basado en el Establecimiento seleccionado
 const cargarEstructurasDropdown = (estId) => {
     const estructuras = getDB('estructuras').filter(e => e.establecimiento_id == estId);
     const select = document.getElementById('actStructName');
-    
-    if (estructuras.length === 0) {
-        select.innerHTML = '<option value="">-- No hay estructuras --</option>';
-        return;
-    }
-    
+    if (estructuras.length === 0) { select.innerHTML = '<option value="">-- No hay estructuras --</option>'; return; }
     select.innerHTML = estructuras.map(e => `<option value="${e.id}">${e.nombre}</option>`).join('');
 };
 
-// Mostrar lista visual de estructuras (Mini galería)
 const renderListaEstructuras = () => {
     const container = document.getElementById('listaEstructuras');
     const estIdSelect = document.getElementById('structEstSelect').value;
     if(!estIdSelect) return;
-
     const estructuras = getDB('estructuras').filter(e => e.establecimiento_id == estIdSelect);
-    if(estructuras.length === 0) { container.innerHTML = '<small class="text-muted">Sin estructuras añadidas.</small>'; return; }
-
-    container.innerHTML = '<hr><h6>Estructuras añadidas:</h6>' + 
-        estructuras.map(e => `
-            <div class="d-flex align-items-center mb-1">
-                <i class="bi bi-check-circle-fill text-success me-2"></i>
-                <span>${e.nombre} <small class="text-muted">(${e.foto})</small></span>
-            </div>
-        `).join('');
+    if(estructuras.length === 0) { container.innerHTML = '<small class="text-muted">Sin estructuras.</small>'; return; }
+    container.innerHTML = '<hr><h6>Lista:</h6>' + estructuras.map(e => `<div class="d-flex align-items-center mb-1"><i class="bi bi-check-circle-fill text-success me-2"></i>${e.nombre}</div>`).join('');
 };
 
 const generarRegistrosDelDia = () => {
@@ -162,7 +137,7 @@ const generarRegistrosDelDia = () => {
     setDB('registros', regs);
 };
 
-const marcarTarea = (idReg, tipo) => {
+const marcarTarea = (idReg) => {
     const regs = getDB('registros');
     const reg = regs.find(r => r.id === idReg);
     reg.estado = 'completado';
@@ -174,19 +149,17 @@ const marcarTarea = (idReg, tipo) => {
 const renderTecnicoTareas = () => {
     actualizarSelectsTecnico();
     generarRegistrosDelDia();
-    
     const regs = getDB('registros');
     const acts = getDB('actividades');
     const ests = getDB('establecimientos');
     const estructuras = getDB('estructuras');
     const hoy = new Date().toISOString().split('T')[0];
 
-    // Filtrar tareas pendientes
     const tareas = regs.filter(r => r.fecha_programada === hoy && r.estado === 'pendiente')
         .map(r => {
             const act = acts.find(a => a.id === r.actividad_id);
-            const est = ests.find(e => e.id === act.establecimiento_id);
-            const struct = estructuras.find(s => s.id === act.estructura_id);
+            const est = act ? ests.find(e => e.id === act.establecimiento_id) : null;
+            const struct = act ? estructuras.find(s => s.id === act.estructura_id) : null;
             return { ...r, actividad: act, establecimiento: est, estructura: struct };
         });
     
@@ -198,13 +171,10 @@ const renderTecnicoTareas = () => {
             <div class="card-body d-flex justify-content-between align-items-center">
                 <div>
                     <h6 class="mb-1">${t.actividad.nombre}</h6>
-                    <small class="text-muted">
-                        <b class="text-primary">${t.establecimiento ? t.establecimiento.nombre : 'N/A'}</b> 
-                        > <b>${t.estructura ? t.estructura.nombre : 'N/A'}</b>
-                    </small>
+                    <small class="text-muted"><b>${t.establecimiento ? t.establecimiento.nombre : ''}</b> > ${t.estructura ? t.estructura.nombre : ''}</small>
                 </div>
                 <div>
-                    <button onclick="marcarTarea(${t.id}, 'check')" class="btn btn-success btn-sm"><i class="bi bi-check"></i> Listo</button>
+                    <button onclick="marcarTarea(${t.id})" class="btn btn-success btn-sm"><i class="bi bi-check"></i> Listo</button>
                 </div>
             </div>
         </div>
@@ -213,7 +183,7 @@ const renderTecnicoTareas = () => {
 };
 
 // ==========================================
-// INSPECTOR
+// INSPECTOR - LÓGICA CON FILTROS
 // ==========================================
 const validarTarea = (idReg, nuevoEstado) => {
     const regs = getDB('registros');
@@ -226,7 +196,6 @@ const renderInspectorTable = () => {
     const regs = getDB('registros');
     const acts = getDB('actividades');
     const ests = getDB('establecimientos');
-    const estructuras = getDB('estructuras');
 
     // KPIs
     const total = regs.length;
@@ -239,13 +208,18 @@ const renderInspectorTable = () => {
     // Filtros
     const searchVal = document.getElementById('filterSearch').value.toLowerCase();
     const statusVal = document.getElementById('filterStatus').value;
+    const freqVal = document.getElementById('filterFreq').value; // Nuevo filtro
 
     let filteredData = regs.map(r => {
         const act = acts.find(a => a.id === r.actividad_id);
         const est = act ? ests.find(e => e.id === act.establecimiento_id) : null;
         return { ...r, actividad: act, establecimiento: est };
     }).filter(row => {
+        // Filtro Estado
         if (statusVal !== 'all' && row.estado !== statusVal) return false;
+        // Filtro Frecuencia
+        if (freqVal !== 'all' && row.actividad && row.actividad.frecuencia !== freqVal) return false;
+        // Filtro Buscador
         if (searchVal) {
             const matchEst = row.establecimiento && row.establecimiento.nombre.toLowerCase().includes(searchVal);
             const matchOwner = row.establecimiento && row.establecimiento.propietario && row.establecimiento.propietario.toLowerCase().includes(searchVal);
@@ -267,11 +241,12 @@ const renderInspectorTable = () => {
                 <td>${row.establecimiento ? row.establecimiento.nombre : 'N/A'}</td>
                 <td>${row.actividad.estructura_nombre}</td>
                 <td>${row.actividad.nombre}</td>
+                <td><span class="badge bg-info text-dark">${row.actividad.frecuencia.toUpperCase()}</span></td>
                 <td><small>${row.establecimiento ? row.establecimiento.propietario : '-'}<br><span class="text-muted">CI: ${row.establecimiento ? row.establecimiento.ci_ruc : '-'}</span></small></td>
                 <td><span class="badge ${badgeClass}">${row.estado.toUpperCase()}</span></td>
                 <td>
                     ${row.estado === 'completado' ? `
-                        <button onclick="validirTarea(${row.id}, 'validado')" class="btn btn-sm btn-success"><i class="bi bi-check"></i></button>
+                        <button onclick="validarTarea(${row.id}, 'validado')" class="btn btn-sm btn-success"><i class="bi bi-check"></i></button>
                         <button onclick="validarTarea(${row.id}, 'rechazado')" class="btn btn-sm btn-danger"><i class="bi bi-x"></i></button>
                     ` : '-'}
                 </td>
@@ -279,7 +254,7 @@ const renderInspectorTable = () => {
     }).join('');
 };
 
-// PDF Generation
+// PDF
 function generatePDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
@@ -291,15 +266,12 @@ function generatePDF() {
     doc.setTextColor(0, 74, 152);
     doc.text("Informe de Fiscalización - GAD", 14, 22);
     doc.setFontSize(10);
-    doc.setTextColor(100);
     doc.text("Fecha: " + new Date().toLocaleDateString(), 14, 30);
 
     const total = regs.length;
     const completadas = regs.filter(r => ['completado', 'validado'].includes(r.estado)).length;
     const porcentaje = total > 0 ? Math.round((completadas/total)*100) : 0;
-
-    doc.setFontSize(12); doc.setTextColor(0);
-    doc.text("Resumen: " + porcentaje + "% de cumplimiento (" + completadas + "/" + total + " tareas).", 14, 45);
+    doc.text("Resumen: " + porcentaje + "% de cumplimiento.", 14, 45);
 
     const tableData = [];
     regs.forEach(r => {
@@ -310,6 +282,7 @@ function generatePDF() {
             est ? est.nombre : '-',
             act ? act.estructura_nombre : '-',
             act ? act.nombre : '-',
+            act ? act.frecuencia.toUpperCase() : '-', // Frecuencia en PDF
             est ? est.propietario : '-',
             r.estado.toUpperCase()
         ]);
@@ -317,7 +290,7 @@ function generatePDF() {
 
     doc.autoTable({
         startY: 55,
-        head: [['Fecha', 'Establecimiento', 'Estructura', 'Actividad', 'Propietario', 'Estado']],
+        head: [['Fecha', 'Establecimiento', 'Estructura', 'Actividad', 'Frec.', 'Propietario', 'Estado']],
         body: tableData,
         theme: 'grid',
         headStyles: { fillColor: [0, 74, 152] }
@@ -335,17 +308,16 @@ const renderUI = () => {
 
     if (currentUser.rol === 'tecnico') {
         document.getElementById('tecnicoPanel').classList.remove('d-none');
-        // Listeners forms
         document.getElementById('formEstablecimiento').addEventListener('submit', crearEstablecimiento);
         document.getElementById('formEstructura').addEventListener('submit', crearEstructura);
         document.getElementById('formActividad').addEventListener('submit', crearActividad);
         document.getElementById('structEstSelect').addEventListener('change', renderListaEstructuras);
-        
         renderTecnicoTareas();
     } else {
         document.getElementById('inspectorPanel').classList.remove('d-none');
         document.getElementById('filterSearch').addEventListener('keyup', renderInspectorTable);
         document.getElementById('filterStatus').addEventListener('change', renderInspectorTable);
+        document.getElementById('filterFreq').addEventListener('change', renderInspectorTable); // Listener nuevo
         renderInspectorTable();
     }
 };
