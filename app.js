@@ -45,18 +45,30 @@ const crearEstablecimiento = (e) => {
     const pdfInput = document.getElementById('estPlanPdf');
     const pdfName = pdfInput.files.length > 0 ? pdfInput.files[0].name : 'Sin plan';
 
+    // CAPTURA DE DÍAS DE ATENCIÓN
+    const diasAtencion = [];
+    document.querySelectorAll('.dia-check:checked').forEach(el => {
+        diasAtencion.push(parseInt(el.value)); // Guarda 0=Dom, 1=Lun... 6=Sáb
+    });
+
+    if(diasAtencion.length === 0) {
+        alert("⚠️ Por favor seleccione al menos un día de atención.");
+        return;
+    }
+
     ests.push({
         id: Date.now(),
         nombre: document.getElementById('estName').value,
         direccion: document.getElementById('estDir').value,
         propietario: document.getElementById('estOwner').value,
         ci_ruc: document.getElementById('estCi').value,
-        plan_pdf: pdfName, // Guardamos nombre del PDF
+        plan_pdf: pdfName,
+        dias_atencion: diasAtencion, // Guardamos el array de días
         usuario_id: currentUser.id,
         usuario_nombre: currentUser.nombre
     });
     setDB('establecimientos', ests);
-    alert(`✅ Establecimiento guardado. Plan: ${pdfName}`);
+    alert(`✅ Establecimiento guardado.`);
     e.target.reset();
     actualizarSelectsTecnico();
 };
@@ -92,9 +104,9 @@ const crearActividad = (e) => {
         frecuencia: document.getElementById('actFreq').value
     });
     setDB('actividades', acts);
-    alert('✅ Actividad creada. Ahora aparecerá en su lista de pendientes.');
+    alert('✅ Actividad creada.');
     e.target.reset();
-    generarRegistrosDelDia(); // Genera la tarea inmediatamente
+    generarRegistrosDelDia();
     renderTecnicoTareas();
 };
 
@@ -125,14 +137,42 @@ const renderListaEstructuras = () => {
     container.innerHTML = '<hr><h6>Lista:</h6>' + estructuras.map(e => `<div class="d-flex align-items-center mb-1"><i class="bi bi-check-circle-fill text-success me-2"></i>${e.nombre}</div>`).join('');
 };
 
+// LÓGICA MODIFICADA: Respetar días de atención
 const generarRegistrosDelDia = () => {
-    const hoy = new Date().toISOString().split('T')[0];
+    const hoy = new Date();
+    const hoyStr = hoy.toISOString().split('T')[0];
+    const diaSemana = hoy.getDay(); // 0 (Domingo) a 6 (Sábado)
+
     const acts = getDB('actividades');
     const regs = getDB('registros');
+    const ests = getDB('establecimientos');
+
     acts.forEach(act => {
-        // Solo genera si no existe registro para HOY
-        if (!regs.find(r => r.actividad_id === act.id && r.fecha_programada === hoy)) {
-            regs.push({ id: Date.now() + Math.random(), actividad_id: act.id, fecha_programada: hoy, estado: 'pendiente' });
+        // Si ya existe registro, no hacer nada
+        if (regs.find(r => r.actividad_id === act.id && r.fecha_programada === hoyStr)) return;
+
+        const est = ests.find(e => e.id === act.establecimiento_id);
+        let generar = false;
+
+        // Lógica de generación
+        if (act.frecuencia === 'diaria') {
+            // Para tareas diarias, verificar si el establecimiento trabaja HOY
+            if (est && est.dias_atencion && est.dias_atencion.includes(diaSemana)) {
+                generar = true;
+            }
+        } else {
+            // Para mensual/anual, por ahora generamos en el día actual para el demo
+            // En un sistema real, esto se calcularía según la fecha de inicio del plan
+            generar = true;
+        }
+
+        if (generar) {
+            regs.push({
+                id: Date.now() + Math.random(),
+                actividad_id: act.id,
+                fecha_programada: hoyStr,
+                estado: 'pendiente'
+            });
         }
     });
     setDB('registros', regs);
@@ -144,12 +184,12 @@ const marcarTarea = (idReg) => {
     reg.estado = 'completado';
     setDB('registros', regs);
     alert('✅ ¡Tarea completada!');
-    renderTecnicoTareas(); // Volver a renderizar para que desaparezca de la lista
+    renderTecnicoTareas();
 };
 
 const renderTecnicoTareas = () => {
     actualizarSelectsTecnico();
-    generarRegistrosDelDia();
+    generarRegistrosDelDia(); // Verifica si debe generar tareas hoy
     
     const regs = getDB('registros');
     const acts = getDB('actividades');
@@ -157,21 +197,16 @@ const renderTecnicoTareas = () => {
     const estructuras = getDB('estructuras');
     const hoy = new Date().toISOString().split('T')[0];
 
-    // FILTRO ESTRICTO: Solo pendientes de hoy
     const tareas = regs.filter(r => r.fecha_programada === hoy && r.estado === 'pendiente')
         .map(r => {
             const act = acts.find(a => a.id === r.actividad_id);
-            // Filtrar solo actividades del usuario actual
             const est = act ? ests.find(e => e.id === act.establecimiento_id && e.usuario_id === currentUser.id) : null;
-            if(!est) return null; // Si no es suya, no mostrar
-            
+            if(!est) return null;
             const struct = act ? estructuras.find(s => s.id === act.estructura_id) : null;
             return { ...r, actividad: act, establecimiento: est, estructura: struct };
-        }).filter(t => t !== null); // Limpiar nulos
+        }).filter(t => t !== null);
     
     const container = document.getElementById('listaTareasTecnico');
-    
-    // Mensaje si no hay tareas
     if (tareas.length === 0) {
         container.innerHTML = '<div class="text-center text-muted py-5"><i class="bi bi-emoji-smile text-success fs-1"></i><h5 class="mt-3">¡Todo al día!</h5><p>No tienes tareas pendientes para hoy.</p></div>'; 
         document.getElementById('dateToday').textContent = new Date().toLocaleDateString(); 
