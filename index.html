@@ -4,12 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GAD - Sistema de Mantenimiento</title>
-    <!-- CSS de Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="style.css">
-    
-    <!-- Librerías para PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 </head>
@@ -42,8 +39,6 @@
 
         <!-- PANEL TÉCNICO -->
         <div id="tecnicoPanel" class="d-none">
-            
-            <!-- 1. TAREAS PENDIENTES -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center">
                     <span><i class="bi bi-list-check me-2"></i>Mis Actividades Pendientes</span>
@@ -52,7 +47,6 @@
                 <div class="card-body" id="listaTareasTecnico"></div>
             </div>
 
-            <!-- 2. CONFIGURACIÓN (ACORDEÓN) -->
             <div class="accordion" id="accordionConfig">
                 <div class="accordion-item">
                     <h2 class="accordion-header">
@@ -74,6 +68,44 @@
                                                     <div class="col-md-6 mb-3"><label>CI / RUC</label><input type="text" id="estCi" class="form-control"></div>
                                                 </div>
                                                 <div class="mb-3"><label>Dirección</label><input type="text" id="estDir" class="form-control"></div>
+                                                
+                                                <!-- NUEVO: DIAS DE ATENCIÓN -->
+                                                <div class="mb-3">
+                                                    <label>Días de Atención / Operación</label>
+                                                    <div class="d-flex flex-wrap gap-2 mt-1">
+                                                        <div class="form-check form-check-inline me-3">
+                                                            <input class="form-check-input dia-check" type="checkbox" id="dia_1" value="1">
+                                                            <label class="form-check-label" for="dia_1">Lunes</label>
+                                                        </div>
+                                                        <div class="form-check form-check-inline me-3">
+                                                            <input class="form-check-input dia-check" type="checkbox" id="dia_2" value="2">
+                                                            <label class="form-check-label" for="dia_2">Martes</label>
+                                                        </div>
+                                                        <div class="form-check form-check-inline me-3">
+                                                            <input class="form-check-input dia-check" type="checkbox" id="dia_3" value="3">
+                                                            <label class="form-check-label" for="dia_3">Miérc</label>
+                                                        </div>
+                                                        <div class="form-check form-check-inline me-3">
+                                                            <input class="form-check-input dia-check" type="checkbox" id="dia_4" value="4">
+                                                            <label class="form-check-label" for="dia_4">Jueves</label>
+                                                        </div>
+                                                        <div class="form-check form-check-inline me-3">
+                                                            <input class="form-check-input dia-check" type="checkbox" id="dia_5" value="5">
+                                                            <label class="form-check-label" for="dia_5">Viernes</label>
+                                                        </div>
+                                                        <div class="form-check form-check-inline me-3">
+                                                            <input class="form-check-input dia-check" type="checkbox" id="dia_6" value="6">
+                                                            <label class="form-check-label" for="dia_6">Sábado</label>
+                                                        </div>
+                                                        <div class="form-check form-check-inline me-3">
+                                                            <input class="form-check-input dia-check" type="checkbox" id="dia_0" value="0">
+                                                            <label class="form-check-label" for="dia_0">Domingo</label>
+                                                        </div>
+                                                    </div>
+                                                    <small class="text-muted">Marque los días que labora el establecimiento.</small>
+                                                </div>
+                                                <!-- FIN NUEVO -->
+
                                                 <div class="mb-3">
                                                     <label>Plan de Mantenimiento Anual (PDF)</label>
                                                     <input type="file" id="estPlanPdf" class="form-control form-control-sm" accept=".pdf">
@@ -88,7 +120,7 @@
                                         <div class="card-body">
                                             <form id="formEstructura">
                                                 <div class="mb-3"><label>Establecimiento</label><select id="structEstSelect" class="form-select" required></select></div>
-                                                <div class="mb-3"><label>Nombre Estructura</label><input type="text" id="structName" class="form-control" placeholder="Ej: Torre de control" required></div>
+                                                <div class="mb-3"><label>Nombre Estructura</label><input type="text" id="structName" class="form-control" required></div>
                                                 <div class="mb-3"><label>Foto</label><input type="file" id="structPhoto" class="form-control form-control-sm" accept="image/*"></div>
                                                 <button type="submit" class="btn btn-primary w-100">Guardar Estructura</button>
                                             </form>
@@ -157,11 +189,7 @@
             </div>
         </div>
     </div>
-
-    <!-- ¡IMPORTANTE! Script de Bootstrap (necesario para el acordeón) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
-    <!-- Tu lógica personalizada -->
     <script src="app.js"></script>
 </body>
 </html>
