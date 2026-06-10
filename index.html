@@ -68,46 +68,20 @@
                                                     <div class="col-md-6 mb-3"><label>CI / RUC</label><input type="text" id="estCi" class="form-control"></div>
                                                 </div>
                                                 <div class="mb-3"><label>Dirección</label><input type="text" id="estDir" class="form-control"></div>
-                                                
-                                                <!-- NUEVO: DIAS DE ATENCIÓN -->
                                                 <div class="mb-3">
-                                                    <label>Días de Atención / Operación</label>
+                                                    <label>Días de Atención</label>
                                                     <div class="d-flex flex-wrap gap-2 mt-1">
-                                                        <div class="form-check form-check-inline me-3">
-                                                            <input class="form-check-input dia-check" type="checkbox" id="dia_1" value="1">
-                                                            <label class="form-check-label" for="dia_1">Lunes</label>
-                                                        </div>
-                                                        <div class="form-check form-check-inline me-3">
-                                                            <input class="form-check-input dia-check" type="checkbox" id="dia_2" value="2">
-                                                            <label class="form-check-label" for="dia_2">Martes</label>
-                                                        </div>
-                                                        <div class="form-check form-check-inline me-3">
-                                                            <input class="form-check-input dia-check" type="checkbox" id="dia_3" value="3">
-                                                            <label class="form-check-label" for="dia_3">Miérc</label>
-                                                        </div>
-                                                        <div class="form-check form-check-inline me-3">
-                                                            <input class="form-check-input dia-check" type="checkbox" id="dia_4" value="4">
-                                                            <label class="form-check-label" for="dia_4">Jueves</label>
-                                                        </div>
-                                                        <div class="form-check form-check-inline me-3">
-                                                            <input class="form-check-input dia-check" type="checkbox" id="dia_5" value="5">
-                                                            <label class="form-check-label" for="dia_5">Viernes</label>
-                                                        </div>
-                                                        <div class="form-check form-check-inline me-3">
-                                                            <input class="form-check-input dia-check" type="checkbox" id="dia_6" value="6">
-                                                            <label class="form-check-label" for="dia_6">Sábado</label>
-                                                        </div>
-                                                        <div class="form-check form-check-inline me-3">
-                                                            <input class="form-check-input dia-check" type="checkbox" id="dia_0" value="0">
-                                                            <label class="form-check-label" for="dia_0">Domingo</label>
-                                                        </div>
+                                                        <div class="form-check form-check-inline"><input class="form-check-input dia-check" type="checkbox" id="dia_1" value="1"><label class="form-check-label" for="dia_1">Lun</label></div>
+                                                        <div class="form-check form-check-inline"><input class="form-check-input dia-check" type="checkbox" id="dia_2" value="2"><label class="form-check-label" for="dia_2">Mar</label></div>
+                                                        <div class="form-check form-check-inline"><input class="form-check-input dia-check" type="checkbox" id="dia_3" value="3"><label class="form-check-label" for="dia_3">Mié</label></div>
+                                                        <div class="form-check form-check-inline"><input class="form-check-input dia-check" type="checkbox" id="dia_4" value="4"><label class="form-check-label" for="dia_4">Jue</label></div>
+                                                        <div class="form-check form-check-inline"><input class="form-check-input dia-check" type="checkbox" id="dia_5" value="5"><label class="form-check-label" for="dia_5">Vie</label></div>
+                                                        <div class="form-check form-check-inline"><input class="form-check-input dia-check" type="checkbox" id="dia_6" value="6"><label class="form-check-label" for="dia_6">Sáb</label></div>
+                                                        <div class="form-check form-check-inline"><input class="form-check-input dia-check" type="checkbox" id="dia_0" value="0"><label class="form-check-label" for="dia_0">Dom</label></div>
                                                     </div>
-                                                    <small class="text-muted">Marque los días que labora el establecimiento.</small>
                                                 </div>
-                                                <!-- FIN NUEVO -->
-
                                                 <div class="mb-3">
-                                                    <label>Plan de Mantenimiento Anual (PDF)</label>
+                                                    <label>Plan de Mantenimiento (PDF)</label>
                                                     <input type="file" id="estPlanPdf" class="form-control form-control-sm" accept=".pdf">
                                                 </div>
                                                 <button type="submit" class="btn btn-success w-100"><i class="bi bi-plus-circle me-1"></i> Guardar</button>
@@ -137,12 +111,34 @@
                                                 <div class="mb-3"><label>Establecimiento</label><select id="actEst" class="form-select" required></select></div>
                                                 <div class="mb-3"><label>Estructura</label><select id="actStructName" class="form-select" required></select></div>
                                                 <div class="mb-3"><label>Nombre de la Actividad</label><input type="text" id="actName" class="form-control" required></div>
-                                                <div class="mb-3"><label>Frecuencia</label>
-                                                    <select id="actFreq" class="form-select">
+                                                <div class="mb-3">
+                                                    <label>Frecuencia</label>
+                                                    <select id="actFreq" class="form-select" required>
                                                         <option value="diaria">Diaria</option>
+                                                        <option value="semanal">Semanal</option>
                                                         <option value="mensual">Mensual</option>
+                                                        <option value="semestral">Semestral</option>
                                                         <option value="anual">Anual</option>
                                                     </select>
+                                                </div>
+                                                <!-- NUEVO: Selección de Mes -->
+                                                <div class="mb-3 d-none" id="mesField">
+                                                    <label>Mes de Ejecución</label>
+                                                    <select id="actMes" class="form-select">
+                                                        <option value="0">Enero</option>
+                                                        <option value="1">Febrero</option>
+                                                        <option value="2">Marzo</option>
+                                                        <option value="3">Abril</option>
+                                                        <option value="4">Mayo</option>
+                                                        <option value="5">Junio</option>
+                                                        <option value="6">Julio</option>
+                                                        <option value="7">Agosto</option>
+                                                        <option value="8">Septiembre</option>
+                                                        <option value="9">Octubre</option>
+                                                        <option value="10">Noviembre</option>
+                                                        <option value="11">Diciembre</option>
+                                                    </select>
+                                                    <small class="text-muted">Seleccione el mes en que se debe realizar esta actividad.</small>
                                                 </div>
                                                 <button type="submit" class="btn btn-success w-100">Programar</button>
                                             </form>
@@ -168,14 +164,14 @@
                     </div>
                 </div>
             </div>
-
-            <div class="row mb-4">
+            <!-- KPIs y Tabla omitidos por brevedad, copiar del anterior si es necesario, el JS los actualiza -->
+            <!-- ... KPIs y Tabla Igual que antes ... -->
+             <div class="row mb-4">
                 <div class="col-md-3"><div class="card kpi-card border-0 shadow-sm bg-success text-white"><div class="card-body text-center"><h2 id="kpiCumplimiento">0%</h2><small>Cumplimiento</small></div></div></div>
                 <div class="col-md-3"><div class="card kpi-card border-0 shadow-sm"><div class="card-body text-center"><h2 id="kpiTotal">0</h2><small>Total Tareas</small></div></div></div>
                 <div class="col-md-3"><div class="card kpi-card border-0 shadow-sm bg-warning"><div class="card-body text-center"><h2 id="kpiPendientes">0</h2><small>Por Revisar</small></div></div></div>
                 <div class="col-md-3"><div class="card kpi-card border-0 shadow-sm bg-danger text-white"><div class="card-body text-center"><h2 id="kpiIncumplidas">0</h2><small>Incumplidas</small></div></div></div>
             </div>
-
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white"><i class="bi bi-table me-2"></i>Reporte General</div>
                 <div class="card-body">
