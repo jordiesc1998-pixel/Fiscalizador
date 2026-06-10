@@ -40,21 +40,12 @@ const logout = () => { localStorage.removeItem('sessionUser'); location.reload()
 const crearEstablecimiento = (e) => {
     e.preventDefault();
     const ests = getDB('establecimientos');
-    
-    // Captura del PDF
     const pdfInput = document.getElementById('estPlanPdf');
     const pdfName = pdfInput.files.length > 0 ? pdfInput.files[0].name : 'Sin plan';
-
-    // CAPTURA DE DÍAS DE ATENCIÓN
     const diasAtencion = [];
-    document.querySelectorAll('.dia-check:checked').forEach(el => {
-        diasAtencion.push(parseInt(el.value)); // Guarda 0=Dom, 1=Lun... 6=Sáb
-    });
+    document.querySelectorAll('.dia-check:checked').forEach(el => diasAtencion.push(parseInt(el.value)));
 
-    if(diasAtencion.length === 0) {
-        alert("⚠️ Por favor seleccione al menos un día de atención.");
-        return;
-    }
+    if(diasAtencion.length === 0) { alert("Seleccione días de atención."); return; }
 
     ests.push({
         id: Date.now(),
@@ -63,12 +54,12 @@ const crearEstablecimiento = (e) => {
         propietario: document.getElementById('estOwner').value,
         ci_ruc: document.getElementById('estCi').value,
         plan_pdf: pdfName,
-        dias_atencion: diasAtencion, // Guardamos el array de días
+        dias_atencion: diasAtencion,
         usuario_id: currentUser.id,
         usuario_nombre: currentUser.nombre
     });
     setDB('establecimientos', ests);
-    alert(`✅ Establecimiento guardado.`);
+    alert('✅ Establecimiento guardado.');
     e.target.reset();
     actualizarSelectsTecnico();
 };
@@ -83,7 +74,7 @@ const crearEstructura = (e) => {
     const estructuras = getDB('estructuras');
     estructuras.push({ id: Date.now(), establecimiento_id: estId, nombre: nombre, foto: fotoName });
     setDB('estructuras', estructuras);
-    alert(`✅ Estructura agregada.`);
+    alert('✅ Estructura agregada.');
     e.target.reset();
     actualizarSelectsTecnico();
     renderListaEstructuras();
@@ -93,7 +84,9 @@ const crearActividad = (e) => {
     e.preventDefault();
     const structId = parseInt(document.getElementById('actStructName').value);
     const structObj = getDB('estructuras').find(s => s.id === structId);
-    
+    const freq = document.getElementById('actFreq').value;
+    const mes = document.getElementById('actMes').value; // Capturar mes
+
     const acts = getDB('actividades');
     acts.push({
         id: Date.now(),
@@ -101,11 +94,13 @@ const crearActividad = (e) => {
         estructura_nombre: structObj ? structObj.nombre : 'N/A',
         establecimiento_id: structObj ? structObj.establecimiento_id : null,
         nombre: document.getElementById('actName').value,
-        frecuencia: document.getElementById('actFreq').value
+        frecuencia: freq,
+        mes_ejecucion: freq === 'semestral' || freq === 'anual' || freq === 'mensual' ? parseInt(mes) : null // Guardar mes si aplica
     });
     setDB('actividades', acts);
-    alert('✅ Actividad creada.');
+    alert('✅ Actividad programada.');
     e.target.reset();
+    document.getElementById('mesField').classList.add('d-none'); // Ocultar campo mes
     generarRegistrosDelDia();
     renderTecnicoTareas();
 };
@@ -137,48 +132,40 @@ const renderListaEstructuras = () => {
     container.innerHTML = '<hr><h6>Lista:</h6>' + estructuras.map(e => `<div class="d-flex align-items-center mb-1"><i class="bi bi-check-circle-fill text-success me-2"></i>${e.nombre}</div>`).join('');
 };
 
-// LÓGICA MODIFICADA: Respetar días de atención
 const generarRegistrosDelDia = () => {
     const hoy = new Date();
     const hoyStr = hoy.toISOString().split('T')[0];
-    const diaSemana = hoy.getDay(); // 0 (Domingo) a 6 (Sábado)
+    const diaSemana = hoy.getDay();
+    const mesActual = hoy.getMonth();
 
     const acts = getDB('actividades');
     const regs = getDB('registros');
     const ests = getDB('establecimientos');
 
     acts.forEach(act => {
-        // Si ya existe registro, no hacer nada
         if (regs.find(r => r.actividad_id === act.id && r.fecha_programada === hoyStr)) return;
 
         const est = ests.find(e => e.id === act.establecimiento_id);
         let generar = false;
 
-        // Lógica de generación
-        if (act.frecuencia === 'diaria') {
-            // Para tareas diarias, verificar si el establecimiento trabaja HOY
-            if (est && est.dias_atencion && est.dias_atencion.includes(diaSemana)) {
-                generar = true;
-            }
+        if (act.frecuencia === 'diaria' || act.frecuencia === 'semanal') {
+            if (est && est.dias_atencion && est.dias_atencion.includes(diaSemana)) generar = true;
         } else {
-            // Para mensual/anual, por ahora generamos en el día actual para el demo
-            // En un sistema real, esto se calcularía según la fecha de inicio del plan
-            generar = true;
+            // Lógica para Mensual, Semestral, Anual
+            // Para el demo, generamos si el mes actual coincide con el mes configurado
+            // Si es semestral, podría haber lógica de 6 meses, pero simplificamos a "Mes de inicio" para el demo
+            if (act.mes_ejecucion === mesActual) generar = true;
         }
 
         if (generar) {
-            regs.push({
-                id: Date.now() + Math.random(),
-                actividad_id: act.id,
-                fecha_programada: hoyStr,
-                estado: 'pendiente'
-            });
+            regs.push({ id: Date.now() + Math.random(), actividad_id: act.id, fecha_programada: hoyStr, estado: 'pendiente', evidencia: null });
         }
     });
     setDB('registros', regs);
 };
 
-const marcarTarea = (idReg) => {
+// Función separada para marcar tareas rápidas (Diaria/Semanal)
+const marcarTareaRapida = (idReg) => {
     const regs = getDB('registros');
     const reg = regs.find(r => r.id === idReg);
     reg.estado = 'completado';
@@ -187,9 +174,27 @@ const marcarTarea = (idReg) => {
     renderTecnicoTareas();
 };
 
+// Función para subir evidencia (Mensual/Semestral/Anual)
+const subirEvidencia = (idReg) => {
+    const fileInput = document.getElementById(`file-${idReg}`);
+    if (!fileInput || fileInput.files.length === 0) {
+        alert("⚠️ Debe seleccionar un archivo para marcar esta actividad como hecha.");
+        return;
+    }
+    
+    const fileName = fileInput.files[0].name;
+    const regs = getDB('registros');
+    const reg = regs.find(r => r.id === idReg);
+    reg.estado = 'completado'; // En un caso real sería 'pendiente_validacion'
+    reg.evidencia = fileName;
+    setDB('registros', regs);
+    alert(`✅ Evidencia "${fileName}" subida. Tarea completada.`);
+    renderTecnicoTareas();
+};
+
 const renderTecnicoTareas = () => {
     actualizarSelectsTecnico();
-    generarRegistrosDelDia(); // Verifica si debe generar tareas hoy
+    generarRegistrosDelDia();
     
     const regs = getDB('registros');
     const acts = getDB('actividades');
@@ -208,32 +213,47 @@ const renderTecnicoTareas = () => {
     
     const container = document.getElementById('listaTareasTecnico');
     if (tareas.length === 0) {
-        container.innerHTML = '<div class="text-center text-muted py-5"><i class="bi bi-emoji-smile text-success fs-1"></i><h5 class="mt-3">¡Todo al día!</h5><p>No tienes tareas pendientes para hoy.</p></div>'; 
+        container.innerHTML = '<div class="text-center text-muted py-5"><i class="bi bi-emoji-smile text-success fs-1"></i><h5 class="mt-3">¡Todo al día!</h5></div>'; 
         document.getElementById('dateToday').textContent = new Date().toLocaleDateString(); 
         return; 
     }
     
-    container.innerHTML = tareas.map(t => `
-        <div class="card mb-2 shadow-sm border-start border-4 border-primary">
+    // Renderizado condicional
+    container.innerHTML = tareas.map(t => {
+        // Determinar si requiere archivo (Mensual, Semestral, Anual)
+        const requiereArchivo = ['mensual', 'semestral', 'anual'].includes(t.actividad.frecuencia);
+        
+        let actionHtml = '';
+        if (requiereArchivo) {
+            actionHtml = `
+                <div class="d-flex align-items-center gap-2">
+                    <input type="file" id="file-${t.id}" class="form-control form-control-sm" style="max-width: 180px;" required>
+                    <button onclick="subirEvidencia(${t.id})" class="btn btn-success btn-sm"><i class="bi bi-upload"></i></button>
+                </div>`;
+        } else {
+            actionHtml = `<button onclick="marcarTareaRapida(${t.id})" class="btn btn-success btn-sm"><i class="bi bi-check-lg"></i> Listo</button>`;
+        }
+
+        return `
+        <div class="card mb-2 shadow-sm border-start border-4 ${requiereArchivo ? 'border-warning' : 'border-primary'}">
             <div class="card-body d-flex justify-content-between align-items-center">
                 <div>
                     <h6 class="mb-1">${t.actividad.nombre}</h6>
                     <small class="text-muted">
                         <b class="text-primary">${t.establecimiento.nombre}</b> > ${t.estructura ? t.estructura.nombre : 'General'}
+                        <span class="badge bg-secondary ms-1">${t.actividad.frecuencia}</span>
                     </small>
                 </div>
-                <div>
-                    <button onclick="marcarTarea(${t.id})" class="btn btn-success btn-sm"><i class="bi bi-check-lg"></i> Listo</button>
-                </div>
+                <div>${actionHtml}</div>
             </div>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
     
     document.getElementById('dateToday').textContent = new Date().toLocaleDateString();
 };
 
 // ==========================================
-// INSPECTOR
+// INSPECTOR (Sin cambios relevantes, incluir igual que antes)
 // ==========================================
 const validarTarea = (idReg, nuevoEstado) => {
     const regs = getDB('registros');
@@ -267,8 +287,7 @@ const renderInspectorTable = () => {
         if (freqVal !== 'all' && row.actividad && row.actividad.frecuencia !== freqVal) return false;
         if (searchVal) {
             const matchEst = row.establecimiento && row.establecimiento.nombre.toLowerCase().includes(searchVal);
-            const matchOwner = row.establecimiento && row.establecimiento.propietario && row.establecimiento.propietario.toLowerCase().includes(searchVal);
-            if (!matchEst && !matchOwner) return false;
+            if (!matchEst) return false;
         }
         return true;
     });
@@ -311,12 +330,6 @@ function generatePDF() {
     doc.setTextColor(0, 74, 152);
     doc.text("Informe de Fiscalización - GAD", 14, 22);
     
-    const total = regs.length;
-    const completadas = regs.filter(r => ['completado', 'validado'].includes(r.estado)).length;
-    const porcentaje = total > 0 ? Math.round((completadas/total)*100) : 0;
-    doc.setFontSize(12);
-    doc.text("Cumplimiento Global: " + porcentaje + "%", 14, 32);
-
     const tableData = [];
     regs.forEach(r => {
         const act = acts.find(a => a.id === r.actividad_id);
@@ -324,7 +337,6 @@ function generatePDF() {
         tableData.push([
             r.fecha_programada,
             est ? est.nombre : '-',
-            act ? act.estructura_nombre : '-',
             act ? act.nombre : '-',
             act ? act.frecuencia : '-',
             r.estado.toUpperCase()
@@ -332,8 +344,8 @@ function generatePDF() {
     });
 
     doc.autoTable({
-        startY: 40,
-        head: [['Fecha', 'Lugar', 'Estructura', 'Actividad', 'Frec.', 'Estado']],
+        startY: 30,
+        head: [['Fecha', 'Lugar', 'Actividad', 'Frec.', 'Estado']],
         body: tableData,
         theme: 'grid',
         headStyles: { fillColor: [0, 74, 152] }
@@ -355,6 +367,18 @@ const renderUI = () => {
         document.getElementById('formEstructura').addEventListener('submit', crearEstructura);
         document.getElementById('formActividad').addEventListener('submit', crearActividad);
         document.getElementById('structEstSelect').addEventListener('change', renderListaEstructuras);
+        
+        // Listener para mostrar/ocultar campo MES
+        document.getElementById('actFreq').addEventListener('change', (e) => {
+            const freq = e.target.value;
+            const mesField = document.getElementById('mesField');
+            if (['mensual', 'semestral', 'anual'].includes(freq)) {
+                mesField.classList.remove('d-none');
+            } else {
+                mesField.classList.add('d-none');
+            }
+        });
+
         renderTecnicoTareas();
     } else {
         document.getElementById('inspectorPanel').classList.remove('d-none');
