@@ -135,38 +135,42 @@ const crearEstructura = (e) => {
         id: Date.now(),
         establecimiento_id: estId,
         nombre: structName.value,
-        foto: structPhoto.files[0] ? structPhoto.files[0].name : 'sin_foto.jpg'
+        foto: 'sin_foto.jpg' // Simulado
     };
     estructuras.push(newStruct);
     setDB('estructuras', estructuras);
-    
     alert('✅ Estructura agregada. El enlace QR está disponible en la lista de abajo.');
-    
     e.target.reset();
     actualizarSelectsTecnico();
     renderListaEstructuras();
 };
 
+// NUEVO: Crear Actividad con Plantilla
 const crearActividad = (e) => {
     e.preventDefault();
-    const structId = parseInt(actStructName.value);
-    const structObj = getDB('estructuras').find(s => s.id === structId);
+    const estId = parseInt(actEst.value);
     const freq = actFreq.value;
     
+    // Capturar estructuras seleccionadas
+    const estructurasSel = Array.from(document.querySelectorAll('.struct-check:checked')).map(el => el.value);
+    if(estructurasSel.length === 0) { alert("Seleccione al menos una estructura."); return; }
+
     const acts = getDB('actividades');
     acts.push({
         id: Date.now(),
-        estructura_id: structId,
-        estructura_nombre: structObj ? structObj.nombre : 'N/A',
-        establecimiento_id: structObj ? structObj.establecimiento_id : null,
+        establecimiento_id: estId,
         nombre: actName.value,
+        operacion: actOperacion.value,
+        referencia: actReferencia.value,
+        aplica_a: estructurasSel, // Array de IDs o ['todos']
         frecuencia: freq,
-        mes_ejecucion: ['mensual', 'semestral', 'anual'].includes(freq) ? parseInt(actMes.value) : null
+        mes_aplicacion: ['mensual', 'trimestral', 'semestral', 'anual'].includes(freq) ? parseInt(actMes.value) : null
     });
     setDB('actividades', acts);
     alert('✅ Actividad programada.');
     e.target.reset();
     mesField.classList.add('d-none');
+    renderChecklistEstructuras(estId); // Actualizar checklist
     generarRegistrosDelDia();
     renderTecnicoTareas();
 };
@@ -176,20 +180,48 @@ const actualizarSelectsTecnico = () => {
     const opts = ests.map(e => `<option value="${e.id}">${e.nombre}</option>`).join('');
     structEstSelect.innerHTML = opts;
     actEst.innerHTML = opts;
-    actEst.onchange = () => cargarEstructurasDropdown(actEst.value);
-    if(ests.length > 0) cargarEstructurasDropdown(ests[0].id);
+    actEst.onchange = () => {
+        cargarEstructurasChecklist(actEst.value);
+        renderListaEstructuras();
+    };
+    if(ests.length > 0) {
+        cargarEstructurasChecklist(ests[0].id);
+        renderListaEstructuras();
+    }
 };
 
-const cargarEstructurasDropdown = (estId) => {
+// NUEVO: Renderizar Checklist en formulario
+const cargarEstructurasChecklist = (estId) => {
     const estructuras = getDB('estructuras').filter(e => e.establecimiento_id == estId);
-    actStructName.innerHTML = estructuras.length === 0 ? '<option value="">-- No hay --</option>' : estructuras.map(e => `<option value="${e.id}">${e.nombre}</option>`).join('');
+    const container = document.getElementById('checklistEstructuras');
+    if(estructuras.length === 0) {
+        container.innerHTML = '<small class="text-muted">No hay estructuras. Cree una en la sección 2.</small>';
+        return;
+    }
+    container.innerHTML = `
+        <div class="form-check">
+            <input class="form-check-input struct-check" type="checkbox" value="todos" id="check_todos" onchange="toggleTodos(this)">
+            <label class="form-check-label" for="check_todos"><b>Todos</b></label>
+        </div>
+        <hr class="my-1">
+    ` + estructuras.map(e => `
+        <div class="form-check">
+            <input class="form-check-input struct-check" type="checkbox" value="${e.id}" id="check_${e.id}">
+            <label class="form-check-label" for="check_${e.id}">${e.nombre}</label>
+        </div>
+    `).join('');
 };
 
-// Función para copiar el enlace
+const toggleTodos = (el) => {
+    document.querySelectorAll('.struct-check').forEach(check => {
+        if(check.value !== 'todos') check.disabled = el.checked;
+    });
+};
+
 const copiarUrl = (idInput) => {
     const input = document.getElementById(idInput);
     input.select();
-    input.setSelectionRange(0, 99999); // Para móviles
+    input.setSelectionRange(0, 99999); 
     navigator.clipboard.writeText(input.value).then(() => {
         alert('✅ Enlace copiado al portapapeles.');
     }).catch(() => {
@@ -215,7 +247,7 @@ const renderListaEstructuras = () => {
                     <i class="bi bi-check-circle-fill text-success me-2"></i>
                     <strong>${e.nombre}</strong>
                 </div>
-                <label class="form-label small text-muted mb-1">Enlace QR (Para generar e imprimir):</label>
+                <label class="form-label small text-muted mb-1">Enlace QR:</label>
                 <div class="input-group input-group-sm">
                     <input type="text" class="form-control" value="${qrUrl}" readonly id="qr-url-${e.id}">
                     <button class="btn btn-outline-primary" type="button" onclick="copiarUrl('qr-url-${e.id}')">
@@ -227,35 +259,76 @@ const renderListaEstructuras = () => {
     }).join('');
 };
 
+// LÓGICA MEJORADA: Generación de Registros
 const generarRegistrosDelDia = () => {
     const hoy = new Date();
     const hoyStr = hoy.toISOString().split('T')[0];
     const diaSemana = hoy.getDay();
     const mesActual = hoy.getMonth();
+    const diaDelMes = hoy.getDate();
+    const semanaDelMes = Math.ceil(diaDelMes / 7); // 1 a 5
 
     const acts = getDB('actividades');
     const regs = getDB('registros');
     const ests = getDB('establecimientos');
+    const estructurasDB = getDB('estructuras');
 
     acts.forEach(act => {
-        if (regs.find(r => r.actividad_id === act.id && r.fecha_programada === hoyStr)) return;
         const est = ests.find(e => e.id === act.establecimiento_id);
         let generar = false;
 
+        // 1. Validar Frecuencia
         if (['diaria', 'semanal'].includes(act.frecuencia)) {
             if (est && est.dias_atencion && est.dias_atencion.includes(diaSemana)) generar = true;
-        } else {
-            if (act.mes_ejecucion === mesActual) generar = true;
+        } else if (act.frecuencia === 'quincenal') {
+            // Semana 1 y 3
+            if (semanaDelMes === 1 || semanaDelMes === 3) generar = true;
+        } else if (act.frecuencia === 'mensual') {
+            if (act.mes_aplicacion === mesActual) generar = true;
+        } else if (act.frecuencia === 'trimestral') {
+            // Cada 3 meses desde el mes de aplicación
+            if (((mesActual - act.mes_aplicacion + 12) % 3) === 0) generar = true;
+        } else if (['semestral', 'anual'].includes(act.frecuencia)) {
+            if (act.mes_aplicacion === mesActual) generar = true;
         }
 
-        if (generar) regs.push({ id: Date.now() + Math.random(), actividad_id: act.id, fecha_programada: hoyStr, estado: 'pendiente', evidencia: null, obs_inspector: '' });
+        // 2. Si toca hoy, generar por estructura
+        if (generar) {
+            let targets = [];
+            if (act.aplica_a.includes('todos')) {
+                targets = estructurasDB.filter(e => e.establecimiento_id == act.establecimiento_id).map(e => e.id);
+            } else {
+                targets = act.aplica_a;
+            }
+
+            targets.forEach(structId => {
+                // Verificar si ya existe para no duplicar
+                if (!regs.find(r => r.actividad_id === act.id && r.estructura_id === structId && r.fecha_programada === hoyStr)) {
+                    regs.push({
+                        id: Date.now() + Math.random(),
+                        actividad_id: act.id,
+                        estructura_id: structId,
+                        fecha_programada: hoyStr,
+                        estado: 'pendiente',
+                        evidencia: null,
+                        obs_inspector: '',
+                        valor_medido: ''
+                    });
+                }
+            });
+        }
     });
     setDB('registros', regs);
 };
 
 const marcarTareaRapida = (idReg) => {
+    const valInput = document.getElementById(`val-${idReg}`);
+    const valor = valInput ? valInput.value : '';
+    
     const regs = getDB('registros');
-    regs.find(r => r.id === idReg).estado = 'completado';
+    const reg = regs.find(r => r.id === idReg);
+    reg.estado = 'completado';
+    reg.valor_medido = valor;
     setDB('registros', regs);
     renderTecnicoTareas();
 };
@@ -263,10 +336,15 @@ const marcarTareaRapida = (idReg) => {
 const subirEvidencia = (idReg) => {
     const fileInput = document.getElementById(`file-${idReg}`);
     if (!fileInput || fileInput.files.length === 0) { alert("⚠️ Debe seleccionar un archivo."); return; }
+    
+    const valInput = document.getElementById(`val-${idReg}`);
+    const valor = valInput ? valInput.value : '';
+    
     const regs = getDB('registros');
     const reg = regs.find(r => r.id === idReg);
     reg.estado = 'completado';
     reg.evidencia = fileInput.files[0].name;
+    reg.valor_medido = valor;
     setDB('registros', regs);
     alert('✅ Evidencia subida.');
     renderTecnicoTareas();
@@ -282,47 +360,75 @@ const renderTecnicoTareas = () => {
     const estructuras = getDB('estructuras');
     const hoy = new Date().toISOString().split('T')[0];
 
-    const tareas = regs.filter(r => r.fecha_programada === hoy && r.estado === 'pendiente')
+    let tareas = regs.filter(r => r.fecha_programada === hoy && r.estado === 'pendiente')
         .map(r => {
             const act = acts.find(a => a.id === r.actividad_id);
             const est = act ? ests.find(e => e.id === act.establecimiento_id && e.usuario_id === currentUser.id) : null;
             if(!est) return null;
-            const struct = act ? estructuras.find(s => s.id === act.estructura_id) : null;
+            const struct = estructuras.find(s => s.id === r.estructura_id);
             return { ...r, actividad: act, establecimiento: est, estructura: struct };
         }).filter(t => t !== null);
     
+    // FILTRO QR: Si hay sesión QR, mostrar SOLO las de esa estructura
+    if (qrSession) {
+        tareas = tareas.filter(t => t.estructura && t.estructura.id === qrSession.structId);
+    }
+    
     if (tareas.length === 0) {
-        listaTareasTecnico.innerHTML = '<div class="text-center text-muted py-5"><i class="bi bi-emoji-smile text-success fs-1"></i><h5 class="mt-3">¡Todo al día!</h5></div>'; 
+        listaTareasTecnico.innerHTML = `<div class="text-center text-muted py-5"><i class="bi bi-emoji-smile text-success fs-1"></i><h5 class="mt-3">¡Todo al día!</h5>${qrSession ? '<p>Visita otra estructura para ver más tareas.</p>' : ''}</div>`; 
         dateToday.textContent = new Date().toLocaleDateString(); 
         return; 
     }
     
     listaTareasTecnico.innerHTML = tareas.map(t => {
-        const requiereArchivo = ['mensual', 'semestral', 'anual'].includes(t.actividad.frecuencia);
-        const requiereQR = ['diaria', 'semanal'].includes(t.actividad.frecuencia);
+        const requiereArchivo = ['mensual', 'trimestral', 'semestral', 'anual'].includes(t.actividad.frecuencia);
+        const requiereQR = ['diaria', 'semanal', 'quincenal'].includes(t.actividad.frecuencia);
         
         let bloqueado = false;
         if (requiereQR && (!qrSession || qrSession.structId !== t.estructura.id)) {
             bloqueado = true;
         }
 
+        // Buscar último valor medido (Historial)
+        const historicoRegs = regs.filter(r => r.actividad_id === t.actividad.id && r.estructura_id === t.estructura.id && r.valor_medido && r.estado === 'completado')
+            .sort((a,b) => b.fecha_programada.localeCompare(a.fecha_programada));
+        const ultimoValor = historicoRegs.length > 0 ? historicoRegs[0].valor_medido : null;
+
         let actionHtml = '';
         if (bloqueado) {
-            actionHtml = `<button class="btn btn-secondary btn-sm" disabled><i class="bi bi-lock-fill"></i> Escanear QR</button>`;
+            actionHtml = `<button class="btn btn-secondary btn-sm" disabled><i class="bi bi-lock-fill"></i> Escanear QR aquí</button>`;
         } else if (requiereArchivo) {
-            actionHtml = `<div class="d-flex align-items-center gap-2"><input type="file" id="file-${t.id}" class="form-control form-control-sm" style="max-width: 150px;" required><button onclick="subirEvidencia(${t.id})" class="btn btn-success btn-sm"><i class="bi bi-upload"></i></button></div>`;
+            actionHtml = `
+                <div class="d-flex flex-column gap-1" style="min-width: 180px;">
+                    <input type="text" id="val-${t.id}" class="form-control form-control-sm" placeholder="Valor medido (opcional)">
+                    <div class="d-flex gap-1">
+                        <input type="file" id="file-${t.id}" class="form-control form-control-sm" required>
+                        <button onclick="subirEvidencia(${t.id})" class="btn btn-success btn-sm"><i class="bi bi-upload"></i></button>
+                    </div>
+                </div>`;
         } else {
-            actionHtml = `<button onclick="marcarTareaRapida(${t.id})" class="btn btn-success btn-sm"><i class="bi bi-check-lg"></i> Listo</button>`;
+            actionHtml = `
+                <div class="d-flex align-items-center gap-1">
+                    <input type="text" id="val-${t.id}" class="form-control form-control-sm" placeholder="Valor medido" style="max-width: 120px;">
+                    <button onclick="marcarTareaRapida(${t.id})" class="btn btn-success btn-sm"><i class="bi bi-check-lg"></i></button>
+                </div>`;
         }
 
         return `
         <div class="card mb-2 shadow-sm border-start border-4 ${requiereArchivo ? 'border-warning' : 'border-primary'}">
-            <div class="card-body d-flex justify-content-between align-items-center">
-                <div>
-                    <h6 class="mb-1 ${bloqueado ? 'text-muted' : ''}">${bloqueado ? '<i class="bi bi-lock-fill"></i> ' : ''}${t.actividad.nombre}</h6>
-                    <small class="text-muted"><b class="text-primary">${t.establecimiento.nombre}</b> > ${t.estructura ? t.estructura.nombre : 'General'} <span class="badge bg-secondary ms-1">${t.actividad.frecuencia}</span></small>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="me-2">
+                        <h6 class="mb-1 ${bloqueado ? 'text-muted' : ''}">${bloqueado ? '<i class="bi bi-lock-fill"></i> ' : ''}${t.actividad.nombre}</h6>
+                        <small class="text-muted">
+                            <b class="text-primary">${t.establecimiento.nombre}</b> > ${t.estructura ? t.estructura.nombre : 'General'} 
+                            <span class="badge bg-secondary ms-1">${t.actividad.frecuencia}</span>
+                        </small>
+                        ${t.actividad.operacion ? `<p class="small mb-0 mt-1"><b>Operación:</b> ${t.actividad.operacion}</p>` : ''}
+                        ${t.actividad.referencia ? `<p class="small mb-0"><b>Referencia:</b> ${t.actividad.referencia} ${ultimoValor ? `<span class="text-muted">(Último: ${ultimoValor})</span>` : ''}</p>` : ''}
+                    </div>
+                    <div>${actionHtml}</div>
                 </div>
-                <div>${actionHtml}</div>
             </div>
         </div>`;
     }).join('');
@@ -351,7 +457,6 @@ const validarTarea = (idReg, nuevoEstado) => {
 const confirmarRechazo = () => {
     const idReg = parseFloat(document.getElementById('rejectRegId').value);
     const reason = document.getElementById('rejectReason').value.trim();
-    
     if (!reason) { alert("El motivo es obligatorio."); return; }
     
     const regs = getDB('registros');
@@ -422,8 +527,8 @@ const renderInspectorTable = () => {
             <tr>
                 <td>${row.fecha_programada}</td>
                 <td>${row.establecimiento ? row.establecimiento.nombre : 'N/A'}</td>
-                <td>${row.actividad.nombre}</td>
-                <td><span class="badge bg-info text-dark">${row.actividad.frecuencia}</span></td>
+                <td>${row.actividad.nombre}<br><small class="text-muted">Ref: ${row.actividad.referencia || '-'}</small></td>
+                <td><small>${row.valor_medido || '-'}</small></td>
                 <td><span class="badge ${badgeClass}">${row.estado.toUpperCase()}</span></td>
                 <td><small class="text-danger">${row.obs_inspector || '-'}</small></td>
                 <td>
@@ -455,7 +560,7 @@ function generatePDF() {
             r.fecha_programada,
             est ? est.nombre : '-',
             act ? act.nombre : '-',
-            act ? act.frecuencia : '-',
+            r.valor_medido || '-',
             r.estado.toUpperCase(),
             r.obs_inspector || '-'
         ]);
@@ -463,7 +568,7 @@ function generatePDF() {
 
     doc.autoTable({
         startY: 30,
-        head: [['Fecha', 'Lugar', 'Actividad', 'Frec.', 'Estado', 'Observaciones']],
+        head: [['Fecha', 'Lugar', 'Actividad', 'Medido', 'Estado', 'Observaciones']],
         body: tableData,
         theme: 'grid',
         headStyles: { fillColor: [0, 74, 152] }
@@ -487,7 +592,7 @@ const renderUI = () => {
         structEstSelect.addEventListener('change', renderListaEstructuras);
         
         actFreq.addEventListener('change', (e) => {
-            mesField.classList.toggle('d-none', !['mensual', 'semestral', 'anual'].includes(e.target.value));
+            mesField.classList.toggle('d-none', !['mensual', 'trimestral', 'semestral', 'anual'].includes(e.target.value));
         });
 
         verificarSesionQR(); 
