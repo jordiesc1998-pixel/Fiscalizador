@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GAD - Sistema de Mantenimiento v3</title>
+    <title>GAD - Sistema de Mantenimiento v4</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="style.css">
@@ -32,32 +32,21 @@
                             <div class="mb-3"><label class="form-label">Contraseña</label><input type="password" id="loginPass" class="form-control" required></div>
                             <button type="submit" class="btn btn-primary w-100 py-2">Ingresar</button>
                         </form>
-                        <div class="mt-3 text-center text-muted small">Users: inspector@gad.com / tecnico@gad.com (Pass: 12345)</div>
+                        <div class="mt-3 text-center text-muted small">
+                            <b>inspector@gad.com</b> / <b>ingeniero@gad.com</b> / <b>tecnico@gad.com</b><br>(Pass: 12345)
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- PANEL TÉCNICO -->
-        <div id="tecnicoPanel" class="d-none">
-            <div id="qrSessionAlert" class="alert alert-info d-none d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-qr-code-scan me-2"></i>Sesión iniciada en: <b id="qrSessionName"></b></span>
-                <span class="badge bg-primary fs-6" id="qrTimer">59:59</span>
-            </div>
-
-            <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                    <span><i class="bi bi-list-check me-2"></i>Mis Actividades Pendientes</span>
-                    <span class="badge bg-primary" id="dateToday"></span>
-                </div>
-                <div class="card-body" id="listaTareasTecnico"></div>
-            </div>
-
+        <!-- PANEL INGENIERO (Configuración total) -->
+        <div id="ingenieroPanel" class="d-none">
             <div class="accordion" id="accordionConfig">
                 <div class="accordion-item">
                     <h2 class="accordion-header">
                         <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseConfig">
-                            <i class="bi bi-gear-fill me-2 text-secondary"></i> Configuración de Establecimientos y Actividades
+                            <i class="bi bi-gear-fill me-2 text-secondary"></i> Configuración del Sistema (Establecimientos, Estructuras y Actividades)
                         </button>
                     </h2>
                     <div id="collapseConfig" class="accordion-collapse collapse" data-bs-parent="#accordionConfig">
@@ -74,6 +63,11 @@
                                                     <div class="col-md-6 mb-3"><label>CI / RUC</label><input type="text" id="estCi" class="form-control"></div>
                                                 </div>
                                                 <div class="mb-3"><label>Dirección</label><input type="text" id="estDir" class="form-control"></div>
+                                                <!-- SELECTOR DE TECNICO RESPONSABLE -->
+                                                <div class="mb-3">
+                                                    <label>Técnico Responsable</label>
+                                                    <select id="estTech" class="form-select" required></select>
+                                                </div>
                                                 <div class="mb-3">
                                                     <label>Días de Atención</label>
                                                     <div class="d-flex flex-wrap gap-2 mt-1">
@@ -86,9 +80,8 @@
                                                         <div class="form-check form-check-inline"><input class="form-check-input dia-check" type="checkbox" id="dia_0" value="0"><label class="form-check-label" for="dia_0">Dom</label></div>
                                                     </div>
                                                 </div>
-                                                <!-- CAMPO PDF DEVUELTO -->
                                                 <div class="mb-3">
-                                                    <label>Plan de Mantenimiento Anual (PDF)</label>
+                                                    <label>Plan de Mantenimiento (PDF)</label>
                                                     <input type="file" id="estPlanPdf" class="form-control form-control-sm" accept=".pdf">
                                                 </div>
                                                 <button type="submit" class="btn btn-success w-100"><i class="bi bi-plus-circle me-1"></i> Guardar</button>
@@ -102,7 +95,6 @@
                                             <form id="formEstructura">
                                                 <div class="mb-3"><label>Establecimiento</label><select id="structEstSelect" class="form-select" required></select></div>
                                                 <div class="mb-3"><label>Nombre Estructura</label><input type="text" id="structName" class="form-control" required></div>
-                                                <!-- CAMPO FOTO DEVUELTO -->
                                                 <div class="mb-3">
                                                     <label>Fotografía de la Estructura</label>
                                                     <input type="file" id="structPhoto" class="form-control form-control-sm" accept="image/*">
@@ -169,6 +161,22 @@
             </div>
         </div>
 
+        <!-- PANEL TÉCNICO (Solo ejecución) -->
+        <div id="tecnicoPanel" class="d-none">
+            <div id="qrSessionAlert" class="alert alert-info d-none d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-qr-code-scan me-2"></i>Sesión iniciada en: <b id="qrSessionName"></b></span>
+                <span class="badge bg-primary fs-6" id="qrTimer">59:59</span>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-list-check me-2"></i>Mis Actividades Pendientes</span>
+                    <span class="badge bg-primary" id="dateToday"></span>
+                </div>
+                <div class="card-body" id="listaTareasTecnico"></div>
+            </div>
+        </div>
+
         <!-- PANEL INSPECTOR -->
         <div id="inspectorPanel" class="d-none">
             <div class="card border-0 shadow-sm mb-4">
@@ -205,7 +213,6 @@
                 <div class="card-body">
                     <div class="table-responsive">
                         <table class="table table-hover">
-                            <!-- AÑADIDA COLUMNA "REALIZADA POR" -->
                             <thead class="table-light"><tr><th>Fecha</th><th>Establecimiento</th><th>Actividad</th><th>Val. Medido</th><th>Realizada por</th><th>Estado</th><th>Observaciones</th><th>Acciones</th></tr></thead>
                             <tbody id="tablaInspector"></tbody>
                         </table>
