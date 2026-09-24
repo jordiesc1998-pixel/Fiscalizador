@@ -2,14 +2,23 @@
 // LÓGICA DE BASE DE DATOS
 // ==========================================
 const initDB = () => {
-    if (!localStorage.getItem('usuarios')) {
-        const usuarios = [
+    let usuarios = JSON.parse(localStorage.getItem('usuarios') || '[]');
+    
+    // Si no hay usuarios, crea los 3 por defecto
+    if (usuarios.length === 0) {
+        usuarios = [
             { id: 1, email: 'inspector@gad.com', pass: '12345', nombre: 'Inspector Principal', rol: 'inspector' },
             { id: 2, email: 'ingeniero@gad.com', pass: '12345', nombre: 'Carlos Ingeniero', rol: 'ingeniero' },
             { id: 3, email: 'tecnico@gad.com', pass: '12345', nombre: 'Juan Técnico', rol: 'tecnico' }
         ];
-        localStorage.setItem('usuarios', JSON.stringify(usuarios));
+    } else {
+        // Si ya existen, verificamos que el ingeniero exista. Si no, lo agregamos.
+        if (!usuarios.find(u => u.rol === 'ingeniero')) {
+            usuarios.push({ id: Date.now(), email: 'ingeniero@gad.com', pass: '12345', nombre: 'Carlos Ingeniero', rol: 'ingeniero' });
+        }
     }
+    localStorage.setItem('usuarios', JSON.stringify(usuarios));
+
     if (!localStorage.getItem('establecimientos')) localStorage.setItem('establecimientos', '[]');
     if (!localStorage.getItem('estructuras')) localStorage.setItem('estructuras', '[]'); 
     if (!localStorage.getItem('actividades') ) localStorage.setItem('actividades', '[]');
