@@ -5,7 +5,8 @@ const initDB = () => {
     if (!localStorage.getItem('usuarios')) {
         const usuarios = [
             { id: 1, email: 'inspector@gad.com', pass: '12345', nombre: 'Inspector Principal', rol: 'inspector' },
-            { id: 2, email: 'tecnico@gad.com', pass: '12345', nombre: 'Juan Técnico', rol: 'tecnico' }
+            { id: 2, email: 'ingeniero@gad.com', pass: '12345', nombre: 'Carlos Ingeniero', rol: 'ingeniero' },
+            { id: 3, email: 'tecnico@gad.com', pass: '12345', nombre: 'Juan Técnico', rol: 'tecnico' }
         ];
         localStorage.setItem('usuarios', JSON.stringify(usuarios));
     }
@@ -53,55 +54,16 @@ const logout = () => {
 };
 
 // ==========================================
-// TÉCNICO - LÓGICA Y QR
+// INGENIERO - LÓGICA DE CONFIGURACIÓN
 // ==========================================
 
-const verificarSesionQR = () => {
-    const params = new URLSearchParams(window.location.search);
-    const qrId = params.get('qr');
-    if (qrId) {
-        const struct = getDB('estructuras').find(s => s.id == qrId);
-        if (struct) {
-            const expira = Date.now() + (60 * 60 * 1000);
-            qrSession = { structId: struct.id, structName: struct.nombre, expira: expira };
-            localStorage.setItem('qrSession', JSON.stringify(qrSession));
-            window.history.replaceState({}, document.title, window.location.pathname);
-        }
-    } else {
-        const savedSession = localStorage.getItem('qrSession');
-        if (savedSession) {
-            qrSession = JSON.parse(savedSession);
-            if (Date.now() > qrSession.expira) {
-                alert("⏳ Tiempo de sesión agotado. Vuelva a escanear el QR.");
-                localStorage.removeItem('qrSession');
-                qrSession = null;
-            }
-        }
+// Llenar el dropdown de técnicos al cargar el panel del ingeniero
+const cargarDropdownTecnicos = () => {
+    const tecnicos = getDB('usuarios').filter(u => u.rol === 'tecnico');
+    const select = document.getElementById('estTech');
+    if(select) {
+        select.innerHTML = tecnicos.map(t => `<option value="${t.id}">${t.nombre}</option>`).join('');
     }
-    
-    if (qrSession) {
-        document.getElementById('qrSessionAlert').classList.remove('d-none');
-        document.getElementById('qrSessionName').textContent = qrSession.structName;
-        actualizarTemporizador();
-        setInterval(actualizarTemporizador, 1000);
-    }
-};
-
-const actualizarTemporizador = () => {
-    if (!qrSession) return;
-    const restante = qrSession.expira - Date.now();
-    if (restante <= 0) {
-        document.getElementById('qrTimer').textContent = "00:00";
-        localStorage.removeItem('qrSession');
-        qrSession = null;
-        document.getElementById('qrSessionAlert').classList.add('d-none');
-        alert("⏳ Tiempo agotado. Las tareas se han bloqueado.");
-        renderTecnicoTareas();
-        return;
-    }
-    const mins = Math.floor(restante / 60000);
-    const secs = Math.floor((restante % 60000) / 1000);
-    document.getElementById('qrTimer').textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 };
 
 const crearEstablecimiento = (e) => {
@@ -111,9 +73,12 @@ const crearEstablecimiento = (e) => {
     document.querySelectorAll('.dia-check:checked').forEach(el => diasAtencion.push(parseInt(el.value)));
     if(diasAtencion.length === 0) { alert("Seleccione días de atención."); return; }
 
-    // Captura del PDF
     const pdfInput = document.getElementById('estPlanPdf');
     const pdfName = pdfInput.files.length > 0 ? pdfInput.files[0].name : 'Sin plan';
+
+    // Obtener técnico asignado
+    const techId = parseInt(document.getElementById('estTech').value);
+    const tech = getDB('usuarios').find(u => u.id === techId);
 
     ests.push({
         id: Date.now(),
@@ -121,15 +86,16 @@ const crearEstablecimiento = (e) => {
         direccion: estDir.value,
         propietario: estOwner.value,
         ci_ruc: estCi.value,
-        plan_pdf: pdfName, // Guardamos el PDF
+        plan_pdf: pdfName,
         dias_atencion: diasAtencion,
-        usuario_id: currentUser.id,
-        usuario_nombre: currentUser.nombre
+        usuario_id: tech ? tech.id : null, // ID del técnico responsable
+        usuario_nombre: tech ? tech.nombre : 'No asignado'
     });
     setDB('establecimientos', ests);
-    alert('✅ Establecimiento guardado.');
+    alert(`✅ Establecimiento asignado a: ${tech ? tech.nombre : 'Nadie'}`);
     e.target.reset();
-    actualizarSelectsTecnico();
+    cargarDropdownTecnicos();
+    actualizarSelectsIngeniero();
 };
 
 const crearEstructura = (e) => {
@@ -137,7 +103,6 @@ const crearEstructura = (e) => {
     const estId = parseInt(structEstSelect.value);
     const estructuras = getDB('estructuras');
     
-    // Captura de la Foto
     const fotoInput = document.getElementById('structPhoto');
     const fotoName = fotoInput.files.length > 0 ? fotoInput.files[0].name : 'sin_foto.jpg';
 
@@ -145,13 +110,13 @@ const crearEstructura = (e) => {
         id: Date.now(),
         establecimiento_id: estId,
         nombre: structName.value,
-        foto: fotoName // Guardamos la foto
+        foto: fotoName
     };
     estructuras.push(newStruct);
     setDB('estructuras', estructuras);
     alert('✅ Estructura agregada.');
     e.target.reset();
-    actualizarSelectsTecnico();
+    actualizarSelectsIngeniero();
     renderListaEstructuras();
 };
 
@@ -180,11 +145,10 @@ const crearActividad = (e) => {
     mesField.classList.add('d-none');
     cargarEstructurasChecklist(estId);
     generarRegistrosDelDia();
-    renderTecnicoTareas();
 };
 
-const actualizarSelectsTecnico = () => {
-    const ests = getDB('establecimientos').filter(e => e.usuario_id === currentUser.id);
+const actualizarSelectsIngeniero = () => {
+    const ests = getDB('establecimientos');
     const opts = ests.map(e => `<option value="${e.id}">${e.nombre}</option>`).join('');
     structEstSelect.innerHTML = opts;
     actEst.innerHTML = opts;
@@ -316,7 +280,7 @@ const generarRegistrosDelDia = () => {
                         evidencia: null,
                         obs_inspector: '',
                         valor_medido: '',
-                        ejecutado_por: '' // NUEVO CAMPO
+                        ejecutado_por: ''
                     });
                 }
             });
@@ -325,7 +289,58 @@ const generarRegistrosDelDia = () => {
     setDB('registros', regs);
 };
 
-// MODIFICADO: Guardar quién ejecuta la tarea
+// ==========================================
+// TÉCNICO - LÓGICA DE EJECUCIÓN Y QR
+// ==========================================
+
+const verificarSesionQR = () => {
+    const params = new URLSearchParams(window.location.search);
+    const qrId = params.get('qr');
+    if (qrId) {
+        const struct = getDB('estructuras').find(s => s.id == qrId);
+        if (struct) {
+            const expira = Date.now() + (60 * 60 * 1000);
+            qrSession = { structId: struct.id, structName: struct.nombre, expira: expira };
+            localStorage.setItem('qrSession', JSON.stringify(qrSession));
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    } else {
+        const savedSession = localStorage.getItem('qrSession');
+        if (savedSession) {
+            qrSession = JSON.parse(savedSession);
+            if (Date.now() > qrSession.expira) {
+                alert("⏳ Tiempo de sesión agotado. Vuelva a escanear el QR.");
+                localStorage.removeItem('qrSession');
+                qrSession = null;
+            }
+        }
+    }
+    
+    if (qrSession) {
+        document.getElementById('qrSessionAlert').classList.remove('d-none');
+        document.getElementById('qrSessionName').textContent = qrSession.structName;
+        actualizarTemporizador();
+        setInterval(actualizarTemporizador, 1000);
+    }
+};
+
+const actualizarTemporizador = () => {
+    if (!qrSession) return;
+    const restante = qrSession.expira - Date.now();
+    if (restante <= 0) {
+        document.getElementById('qrTimer').textContent = "00:00";
+        localStorage.removeItem('qrSession');
+        qrSession = null;
+        document.getElementById('qrSessionAlert').classList.add('d-none');
+        alert("⏳ Tiempo agotado. Las tareas se han bloqueado.");
+        renderTecnicoTareas();
+        return;
+    }
+    const mins = Math.floor(restante / 60000);
+    const secs = Math.floor((restante % 60000) / 1000);
+    document.getElementById('qrTimer').textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+};
+
 const marcarTareaRapida = (idReg) => {
     const valInput = document.getElementById(`val-${idReg}`);
     const valor = valInput ? valInput.value : '';
@@ -334,12 +349,11 @@ const marcarTareaRapida = (idReg) => {
     const reg = regs.find(r => r.id === idReg);
     reg.estado = 'completado';
     reg.valor_medido = valor;
-    reg.ejecutado_por = currentUser.nombre; // REGISTRO DE USUARIO
+    reg.ejecutado_por = currentUser.nombre; // Guarda el nombre del técnico logueado
     setDB('registros', regs);
     renderTecnicoTareas();
 };
 
-// MODIFICADO: Guardar quién ejecuta la tarea
 const subirEvidencia = (idReg) => {
     const fileInput = document.getElementById(`file-${idReg}`);
     if (!fileInput || fileInput.files.length === 0) { alert("⚠️ Debe seleccionar un archivo."); return; }
@@ -352,14 +366,13 @@ const subirEvidencia = (idReg) => {
     reg.estado = 'completado';
     reg.evidencia = fileInput.files[0].name;
     reg.valor_medido = valor;
-    reg.ejecutado_por = currentUser.nombre; // REGISTRO DE USUARIO
+    reg.ejecutado_por = currentUser.nombre; // Guarda el nombre del técnico logueado
     setDB('registros', regs);
     alert('✅ Evidencia subida.');
     renderTecnicoTareas();
 };
 
 const renderTecnicoTareas = () => {
-    actualizarSelectsTecnico();
     generarRegistrosDelDia();
     
     const regs = getDB('registros');
@@ -368,6 +381,7 @@ const renderTecnicoTareas = () => {
     const estructuras = getDB('estructuras');
     const hoy = new Date().toISOString().split('T')[0];
 
+    // FILTRO: Solo tareas del técnico logueado
     let tareas = regs.filter(r => r.fecha_programada === hoy && r.estado === 'pendiente')
         .map(r => {
             const act = acts.find(a => a.id === r.actividad_id);
@@ -523,7 +537,6 @@ const renderInspectorTable = () => {
         return true;
     });
 
-    // MODIFICADO: Añadida columna Realizada por
     tablaInspector.innerHTML = filteredData.map(row => {
         if(!row.actividad) return '';
         let badgeClass = 'badge-pendiente';
@@ -549,7 +562,6 @@ const renderInspectorTable = () => {
     }).join('');
 };
 
-// MODIFICADO: Incluye técnico en el PDF
 function generatePDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
@@ -570,7 +582,7 @@ function generatePDF() {
             est ? est.nombre : '-',
             act ? act.nombre : '-',
             r.valor_medido || '-',
-            r.ejecutado_por || '-', // Técnico en PDF
+            r.ejecutado_por || '-',
             r.estado.toUpperCase(),
             r.obs_inspector || '-'
         ]);
@@ -588,30 +600,36 @@ function generatePDF() {
 }
 
 // ==========================================
-// RENDER PRINCIPAL
+// RENDER PRINCIPAL (Segrega por Rol)
 // ==========================================
 const renderUI = () => {
     loginScreen.classList.add('d-none');
-    navContent.innerHTML = `<span class="text-white me-3">Hola, <b>${currentUser.nombre}</b></span><button onclick="logout()" class="btn btn-outline-light btn-sm">Salir</button>`;
+    navContent.innerHTML = `<span class="text-white me-3">Hola, <b>${currentUser.nombre}</b> (${currentUser.rol})</span><button onclick="logout()" class="btn btn-outline-light btn-sm">Salir</button>`;
 
-    if (currentUser.rol === 'tecnico') {
-        tecnicoPanel.classList.remove('d-none');
-        formEstablecimiento.addEventListener('submit', crearEstablecimiento);
-        formEstructura.addEventListener('submit', crearEstructura);
-        formActividad.addEventListener('submit', crearActividad);
-        structEstSelect.addEventListener('change', renderListaEstructuras);
+    if (currentUser.rol === 'ingeniero') {
+        document.getElementById('ingenieroPanel').classList.remove('d-none');
+        cargarDropdownTecnicos();
+        document.getElementById('formEstablecimiento').addEventListener('submit', crearEstablecimiento);
+        document.getElementById('formEstructura').addEventListener('submit', crearEstructura);
+        document.getElementById('formActividad').addEventListener('submit', crearActividad);
+        document.getElementById('structEstSelect').addEventListener('change', renderListaEstructuras);
         
-        actFreq.addEventListener('change', (e) => {
+        document.getElementById('actFreq').addEventListener('change', (e) => {
             mesField.classList.toggle('d-none', !['mensual', 'trimestral', 'semestral', 'anual'].includes(e.target.value));
         });
 
+        actualizarSelectsIngeniero();
+    } 
+    else if (currentUser.rol === 'tecnico') {
+        document.getElementById('tecnicoPanel').classList.remove('d-none');
         verificarSesionQR(); 
         renderTecnicoTareas();
-    } else {
-        inspectorPanel.classList.remove('d-none');
-        filterSearch.addEventListener('keyup', renderInspectorTable);
-        filterStatus.addEventListener('change', renderInspectorTable);
-        filterFreq.addEventListener('change', renderInspectorTable);
+    } 
+    else if (currentUser.rol === 'inspector') {
+        document.getElementById('inspectorPanel').classList.remove('d-none');
+        document.getElementById('filterSearch').addEventListener('keyup', renderInspectorTable);
+        document.getElementById('filterStatus').addEventListener('change', renderInspectorTable);
+        document.getElementById('filterFreq').addEventListener('change', renderInspectorTable);
         renderInspectorTable();
     }
 };
