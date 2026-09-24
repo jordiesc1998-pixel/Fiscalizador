@@ -22,6 +22,7 @@ const setDB = (key, data) => localStorage.setItem(key, JSON.stringify(data));
 let currentUser = null;
 let qrSession = null; 
 let chartInstance = null;
+let techTimerInterval = null; // Intervalo para el temporizador del técnico
 
 // ==========================================
 // SESIÓN
@@ -40,6 +41,12 @@ const login = (e) => {
     if (user) {
         currentUser = user;
         localStorage.setItem('sessionUser', JSON.stringify(user));
+        
+        // TEMPORIZADOR TÉCNICO: Guardar hora de expiración (1 hora)
+        if (user.rol === 'tecnico') {
+            localStorage.setItem('techSessionExpiry', Date.now() + (60 * 60 * 1000));
+        }
+        
         renderUI();
     } else {
         loginError.textContent = "Credenciales incorrectas.";
@@ -50,14 +57,35 @@ const login = (e) => {
 const logout = () => {
     localStorage.removeItem('sessionUser');
     localStorage.removeItem('qrSession');
+    localStorage.removeItem('techSessionExpiry'); // Limpiar temporizador
+    if(techTimerInterval) clearInterval(techTimerInterval);
     location.reload();
+};
+
+// Lógica del temporizador global del técnico
+const verificarTemporizadorTecnico = () => {
+    const expiry = localStorage.getItem('techSessionExpiry');
+    if (!expiry) return logout();
+    
+    const remaining = parseInt(expiry) - Date.now();
+    if (remaining <= 0) {
+        alert("⏳ Su sesión de técnico ha expirado (1 hora). Debe volver a iniciar sesión.");
+        logout();
+        return;
+    }
+    
+    const mins = Math.floor(remaining / 60000);
+    const secs = Math.floor((remaining % 60000) / 1000);
+    const timerEl = document.getElementById('techTimer');
+    if(timerEl) {
+        timerEl.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
 };
 
 // ==========================================
 // INGENIERO - LÓGICA DE CONFIGURACIÓN
 // ==========================================
 
-// Llenar el dropdown de técnicos al cargar el panel del ingeniero
 const cargarDropdownTecnicos = () => {
     const tecnicos = getDB('usuarios').filter(u => u.rol === 'tecnico');
     const select = document.getElementById('estTech');
@@ -76,7 +104,6 @@ const crearEstablecimiento = (e) => {
     const pdfInput = document.getElementById('estPlanPdf');
     const pdfName = pdfInput.files.length > 0 ? pdfInput.files[0].name : 'Sin plan';
 
-    // Obtener técnico asignado
     const techId = parseInt(document.getElementById('estTech').value);
     const tech = getDB('usuarios').find(u => u.id === techId);
 
@@ -88,7 +115,7 @@ const crearEstablecimiento = (e) => {
         ci_ruc: estCi.value,
         plan_pdf: pdfName,
         dias_atencion: diasAtencion,
-        usuario_id: tech ? tech.id : null, // ID del técnico responsable
+        usuario_id: tech ? tech.id : null,
         usuario_nombre: tech ? tech.nombre : 'No asignado'
     });
     setDB('establecimientos', ests);
@@ -309,7 +336,7 @@ const verificarSesionQR = () => {
         if (savedSession) {
             qrSession = JSON.parse(savedSession);
             if (Date.now() > qrSession.expira) {
-                alert("⏳ Tiempo de sesión agotado. Vuelva a escanear el QR.");
+                alert("⏳ Tiempo de sesión QR agotado. Vuelva a escanear el QR.");
                 localStorage.removeItem('qrSession');
                 qrSession = null;
             }
@@ -349,7 +376,7 @@ const marcarTareaRapida = (idReg) => {
     const reg = regs.find(r => r.id === idReg);
     reg.estado = 'completado';
     reg.valor_medido = valor;
-    reg.ejecutado_por = currentUser.nombre; // Guarda el nombre del técnico logueado
+    reg.ejecutado_por = currentUser.nombre;
     setDB('registros', regs);
     renderTecnicoTareas();
 };
@@ -366,7 +393,7 @@ const subirEvidencia = (idReg) => {
     reg.estado = 'completado';
     reg.evidencia = fileInput.files[0].name;
     reg.valor_medido = valor;
-    reg.ejecutado_por = currentUser.nombre; // Guarda el nombre del técnico logueado
+    reg.ejecutado_por = currentUser.nombre;
     setDB('registros', regs);
     alert('✅ Evidencia subida.');
     renderTecnicoTareas();
@@ -381,7 +408,6 @@ const renderTecnicoTareas = () => {
     const estructuras = getDB('estructuras');
     const hoy = new Date().toISOString().split('T')[0];
 
-    // FILTRO: Solo tareas del técnico logueado
     let tareas = regs.filter(r => r.fecha_programada === hoy && r.estado === 'pendiente')
         .map(r => {
             const act = acts.find(a => a.id === r.actividad_id);
@@ -547,95 +573,4 @@ const renderInspectorTable = () => {
             <tr>
                 <td>${row.fecha_programada}</td>
                 <td>${row.establecimiento ? row.establecimiento.nombre : 'N/A'}</td>
-                <td>${row.actividad.nombre}<br><small class="text-muted">Ref: ${row.actividad.referencia || '-'}</small></td>
-                <td><small>${row.valor_medido || '-'}</small></td>
-                <td><small>${row.ejecutado_por || '-'}</small></td>
-                <td><span class="badge ${badgeClass}">${row.estado.toUpperCase()}</span></td>
-                <td><small class="text-danger">${row.obs_inspector || '-'}</small></td>
-                <td>
-                    ${row.estado === 'completado' ? `
-                        <button onclick="validarTarea(${row.id}, 'validado')" class="btn btn-sm btn-success"><i class="bi bi-check"></i></button>
-                        <button onclick="validarTarea(${row.id}, 'rechazado')" class="btn btn-sm btn-danger"><i class="bi bi-x"></i></button>
-                    ` : '-'}
-                </td>
-            </tr>`;
-    }).join('');
-};
-
-function generatePDF() {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    const regs = getDB('registros');
-    const acts = getDB('actividades');
-    const ests = getDB('establecimientos');
-
-    doc.setFontSize(20);
-    doc.setTextColor(0, 74, 152);
-    doc.text("Informe de Fiscalización - GAD", 14, 22);
-    
-    const tableData = [];
-    regs.forEach(r => {
-        const act = acts.find(a => a.id === r.actividad_id);
-        const est = act ? ests.find(e => e.id === act.establecimiento_id) : null;
-        tableData.push([
-            r.fecha_programada,
-            est ? est.nombre : '-',
-            act ? act.nombre : '-',
-            r.valor_medido || '-',
-            r.ejecutado_por || '-',
-            r.estado.toUpperCase(),
-            r.obs_inspector || '-'
-        ]);
-    });
-
-    doc.autoTable({
-        startY: 30,
-        head: [['Fecha', 'Lugar', 'Actividad', 'Medido', 'Técnico', 'Estado', 'Observaciones']],
-        body: tableData,
-        theme: 'grid',
-        headStyles: { fillColor: [0, 74, 152] }
-    });
-
-    doc.save('Informe_GAD.pdf');
-}
-
-// ==========================================
-// RENDER PRINCIPAL (Segrega por Rol)
-// ==========================================
-const renderUI = () => {
-    loginScreen.classList.add('d-none');
-    navContent.innerHTML = `<span class="text-white me-3">Hola, <b>${currentUser.nombre}</b> (${currentUser.rol})</span><button onclick="logout()" class="btn btn-outline-light btn-sm">Salir</button>`;
-
-    if (currentUser.rol === 'ingeniero') {
-        document.getElementById('ingenieroPanel').classList.remove('d-none');
-        cargarDropdownTecnicos();
-        document.getElementById('formEstablecimiento').addEventListener('submit', crearEstablecimiento);
-        document.getElementById('formEstructura').addEventListener('submit', crearEstructura);
-        document.getElementById('formActividad').addEventListener('submit', crearActividad);
-        document.getElementById('structEstSelect').addEventListener('change', renderListaEstructuras);
-        
-        document.getElementById('actFreq').addEventListener('change', (e) => {
-            mesField.classList.toggle('d-none', !['mensual', 'trimestral', 'semestral', 'anual'].includes(e.target.value));
-        });
-
-        actualizarSelectsIngeniero();
-    } 
-    else if (currentUser.rol === 'tecnico') {
-        document.getElementById('tecnicoPanel').classList.remove('d-none');
-        verificarSesionQR(); 
-        renderTecnicoTareas();
-    } 
-    else if (currentUser.rol === 'inspector') {
-        document.getElementById('inspectorPanel').classList.remove('d-none');
-        document.getElementById('filterSearch').addEventListener('keyup', renderInspectorTable);
-        document.getElementById('filterStatus').addEventListener('change', renderInspectorTable);
-        document.getElementById('filterFreq').addEventListener('change', renderInspectorTable);
-        renderInspectorTable();
-    }
-};
-
-document.addEventListener('DOMContentLoaded', () => {
-    initDB();
-    checkSession();
-    loginForm.addEventListener('submit', login);
-});
+                <
