@@ -15,7 +15,7 @@ const initDB = () => {
     if (!localStorage.getItem('registros')) localStorage.setItem('registros', '[]');
 };
 
-const getDB = (key) => JSON.parse(localStorage.getItem(key));
+const getDB = (key) => JSON.parse(localStorage.getItem(key)) || [];
 const setDB = (key, data) => localStorage.setItem(key, JSON.stringify(data));
 
 let currentUser = null;
@@ -62,7 +62,7 @@ const verificarSesionQR = () => {
     if (qrId) {
         const struct = getDB('estructuras').find(s => s.id == qrId);
         if (struct) {
-            const expira = Date.now() + (60 * 60 * 1000); // 1 hora
+            const expira = Date.now() + (60 * 60 * 1000);
             qrSession = { structId: struct.id, structName: struct.nombre, expira: expira };
             localStorage.setItem('qrSession', JSON.stringify(qrSession));
             window.history.replaceState({}, document.title, window.location.pathname);
@@ -135,23 +135,21 @@ const crearEstructura = (e) => {
         id: Date.now(),
         establecimiento_id: estId,
         nombre: structName.value,
-        foto: 'sin_foto.jpg' // Simulado
+        foto: 'sin_foto.jpg'
     };
     estructuras.push(newStruct);
     setDB('estructuras', estructuras);
-    alert('✅ Estructura agregada. El enlace QR está disponible en la lista de abajo.');
+    alert('✅ Estructura agregada.');
     e.target.reset();
     actualizarSelectsTecnico();
     renderListaEstructuras();
 };
 
-// NUEVO: Crear Actividad con Plantilla
 const crearActividad = (e) => {
     e.preventDefault();
     const estId = parseInt(actEst.value);
     const freq = actFreq.value;
     
-    // Capturar estructuras seleccionadas
     const estructurasSel = Array.from(document.querySelectorAll('.struct-check:checked')).map(el => el.value);
     if(estructurasSel.length === 0) { alert("Seleccione al menos una estructura."); return; }
 
@@ -160,9 +158,9 @@ const crearActividad = (e) => {
         id: Date.now(),
         establecimiento_id: estId,
         nombre: actName.value,
-        operacion: actOperacion.value,
-        referencia: actReferencia.value,
-        aplica_a: estructurasSel, // Array de IDs o ['todos']
+        operacion: document.getElementById('actOperacion').value,
+        referencia: document.getElementById('actReferencia').value,
+        aplica_a: estructurasSel,
         frecuencia: freq,
         mes_aplicacion: ['mensual', 'trimestral', 'semestral', 'anual'].includes(freq) ? parseInt(actMes.value) : null
     });
@@ -170,7 +168,7 @@ const crearActividad = (e) => {
     alert('✅ Actividad programada.');
     e.target.reset();
     mesField.classList.add('d-none');
-    renderChecklistEstructuras(estId); // Actualizar checklist
+    cargarEstructurasChecklist(estId);
     generarRegistrosDelDia();
     renderTecnicoTareas();
 };
@@ -190,10 +188,10 @@ const actualizarSelectsTecnico = () => {
     }
 };
 
-// NUEVO: Renderizar Checklist en formulario
 const cargarEstructurasChecklist = (estId) => {
     const estructuras = getDB('estructuras').filter(e => e.establecimiento_id == estId);
     const container = document.getElementById('checklistEstructuras');
+    if(!container) return;
     if(estructuras.length === 0) {
         container.innerHTML = '<small class="text-muted">No hay estructuras. Cree una en la sección 2.</small>';
         return;
@@ -259,14 +257,13 @@ const renderListaEstructuras = () => {
     }).join('');
 };
 
-// LÓGICA MEJORADA: Generación de Registros
 const generarRegistrosDelDia = () => {
     const hoy = new Date();
     const hoyStr = hoy.toISOString().split('T')[0];
     const diaSemana = hoy.getDay();
     const mesActual = hoy.getMonth();
     const diaDelMes = hoy.getDate();
-    const semanaDelMes = Math.ceil(diaDelMes / 7); // 1 a 5
+    const semanaDelMes = Math.ceil(diaDelMes / 7);
 
     const acts = getDB('actividades');
     const regs = getDB('registros');
@@ -277,33 +274,29 @@ const generarRegistrosDelDia = () => {
         const est = ests.find(e => e.id === act.establecimiento_id);
         let generar = false;
 
-        // 1. Validar Frecuencia
         if (['diaria', 'semanal'].includes(act.frecuencia)) {
             if (est && est.dias_atencion && est.dias_atencion.includes(diaSemana)) generar = true;
         } else if (act.frecuencia === 'quincenal') {
-            // Semana 1 y 3
             if (semanaDelMes === 1 || semanaDelMes === 3) generar = true;
         } else if (act.frecuencia === 'mensual') {
             if (act.mes_aplicacion === mesActual) generar = true;
         } else if (act.frecuencia === 'trimestral') {
-            // Cada 3 meses desde el mes de aplicación
-            if (((mesActual - act.mes_aplicacion + 12) % 3) === 0) generar = true;
+            if (act.mes_aplicacion !== null && (((mesActual - act.mes_aplicacion + 12) % 3) === 0)) generar = true;
         } else if (['semestral', 'anual'].includes(act.frecuencia)) {
             if (act.mes_aplicacion === mesActual) generar = true;
         }
 
-        // 2. Si toca hoy, generar por estructura
         if (generar) {
             let targets = [];
-            if (act.aplica_a.includes('todos')) {
+            const aplicaA = act.aplica_a || ['todos']; // PROTECCIÓN CONTRA ERRORES
+            if (aplicaA.includes('todos')) {
                 targets = estructurasDB.filter(e => e.establecimiento_id == act.establecimiento_id).map(e => e.id);
             } else {
-                targets = act.aplica_a;
+                targets = aplicaA;
             }
 
             targets.forEach(structId => {
-                // Verificar si ya existe para no duplicar
-                if (!regs.find(r => r.actividad_id === act.id && r.estructura_id === structId && r.fecha_programada === hoyStr)) {
+                if (!regs.find(r => r.actividad_id === act.id && r.estructura_id == structId && r.fecha_programada === hoyStr)) {
                     regs.push({
                         id: Date.now() + Math.random(),
                         actividad_id: act.id,
@@ -365,11 +358,10 @@ const renderTecnicoTareas = () => {
             const act = acts.find(a => a.id === r.actividad_id);
             const est = act ? ests.find(e => e.id === act.establecimiento_id && e.usuario_id === currentUser.id) : null;
             if(!est) return null;
-            const struct = estructuras.find(s => s.id === r.estructura_id);
+            const struct = estructuras.find(s => s.id == r.estructura_id);
             return { ...r, actividad: act, establecimiento: est, estructura: struct };
         }).filter(t => t !== null);
     
-    // FILTRO QR: Si hay sesión QR, mostrar SOLO las de esa estructura
     if (qrSession) {
         tareas = tareas.filter(t => t.estructura && t.estructura.id === qrSession.structId);
     }
@@ -389,8 +381,7 @@ const renderTecnicoTareas = () => {
             bloqueado = true;
         }
 
-        // Buscar último valor medido (Historial)
-        const historicoRegs = regs.filter(r => r.actividad_id === t.actividad.id && r.estructura_id === t.estructura.id && r.valor_medido && r.estado === 'completado')
+        const historicoRegs = regs.filter(r => r.actividad_id === t.actividad.id && r.estructura_id == t.estructura.id && r.valor_medido && r.estado === 'completado')
             .sort((a,b) => b.fecha_programada.localeCompare(a.fecha_programada));
         const ultimoValor = historicoRegs.length > 0 ? historicoRegs[0].valor_medido : null;
 
