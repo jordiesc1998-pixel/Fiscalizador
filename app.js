@@ -19,7 +19,7 @@ const getDB = (key) => JSON.parse(localStorage.getItem(key));
 const setDB = (key, data) => localStorage.setItem(key, JSON.stringify(data));
 
 let currentUser = null;
-let qrSession = null; // Guardará { structId, structName, expira }
+let qrSession = null; 
 let chartInstance = null;
 
 // ==========================================
@@ -56,7 +56,6 @@ const logout = () => {
 // TÉCNICO - LÓGICA Y QR
 // ==========================================
 
-// Verificar si accedió por QR (URL: ?qr=ID_ESTRUCTURA)
 const verificarSesionQR = () => {
     const params = new URLSearchParams(window.location.search);
     const qrId = params.get('qr');
@@ -66,7 +65,6 @@ const verificarSesionQR = () => {
             const expira = Date.now() + (60 * 60 * 1000); // 1 hora
             qrSession = { structId: struct.id, structName: struct.nombre, expira: expira };
             localStorage.setItem('qrSession', JSON.stringify(qrSession));
-            // Limpiar URL
             window.history.replaceState({}, document.title, window.location.pathname);
         }
     } else {
@@ -81,7 +79,6 @@ const verificarSesionQR = () => {
         }
     }
     
-    // Iniciar temporizador visual
     if (qrSession) {
         document.getElementById('qrSessionAlert').classList.remove('d-none');
         document.getElementById('qrSessionName').textContent = qrSession.structName;
@@ -143,9 +140,7 @@ const crearEstructura = (e) => {
     estructuras.push(newStruct);
     setDB('estructuras', estructuras);
     
-    // Mostrar QR generado
-    const qrUrl = `${window.location.origin}${window.location.pathname}?qr=${newStruct.id}`;
-    alert(`✅ Estructura agregada.\n\nURL del QR para imprimir:\n${qrUrl}\n\n(Copie este enlace y genere un QR en google para imprimirlo)`);
+    alert('✅ Estructura agregada. El enlace QR está disponible en la lista de abajo.');
     
     e.target.reset();
     actualizarSelectsTecnico();
@@ -190,11 +185,46 @@ const cargarEstructurasDropdown = (estId) => {
     actStructName.innerHTML = estructuras.length === 0 ? '<option value="">-- No hay --</option>' : estructuras.map(e => `<option value="${e.id}">${e.nombre}</option>`).join('');
 };
 
+// Función para copiar el enlace
+const copiarUrl = (idInput) => {
+    const input = document.getElementById(idInput);
+    input.select();
+    input.setSelectionRange(0, 99999); // Para móviles
+    navigator.clipboard.writeText(input.value).then(() => {
+        alert('✅ Enlace copiado al portapapeles.');
+    }).catch(() => {
+        alert('No se pudo copiar automáticamente. Presiona Ctrl+C.');
+    });
+};
+
 const renderListaEstructuras = () => {
     const estId = structEstSelect.value;
     if(!estId) return;
     const estructuras = getDB('estructuras').filter(e => e.establecimiento_id == estId);
-    listaEstructuras.innerHTML = estructuras.length === 0 ? '<small class="text-muted">Sin estructuras.</small>' : '<hr><h6>Lista:</h6>' + estructuras.map(e => `<div class="d-flex align-items-center mb-1"><i class="bi bi-check-circle-fill text-success me-2"></i>${e.nombre}</div>`).join('');
+    
+    if(estructuras.length === 0) {
+        listaEstructuras.innerHTML = '<small class="text-muted">Sin estructuras.</small>';
+        return;
+    }
+    
+    listaEstructuras.innerHTML = '<hr><h6>Lista de Estructuras:</h6>' + estructuras.map(e => {
+        const qrUrl = `${window.location.origin}${window.location.pathname}?qr=${e.id}`;
+        return `
+            <div class="mb-3 p-2 border rounded bg-light">
+                <div class="d-flex align-items-center mb-2">
+                    <i class="bi bi-check-circle-fill text-success me-2"></i>
+                    <strong>${e.nombre}</strong>
+                </div>
+                <label class="form-label small text-muted mb-1">Enlace QR (Para generar e imprimir):</label>
+                <div class="input-group input-group-sm">
+                    <input type="text" class="form-control" value="${qrUrl}" readonly id="qr-url-${e.id}">
+                    <button class="btn btn-outline-primary" type="button" onclick="copiarUrl('qr-url-${e.id}')">
+                        <i class="bi bi-clipboard"></i> Copiar
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
 };
 
 const generarRegistrosDelDia = () => {
@@ -271,7 +301,6 @@ const renderTecnicoTareas = () => {
         const requiereArchivo = ['mensual', 'semestral', 'anual'].includes(t.actividad.frecuencia);
         const requiereQR = ['diaria', 'semanal'].includes(t.actividad.frecuencia);
         
-        // Lógica de Bloqueo QR
         let bloqueado = false;
         if (requiereQR && (!qrSession || qrSession.structId !== t.estructura.id)) {
             bloqueado = true;
@@ -341,7 +370,6 @@ const renderInspectorTable = () => {
     const acts = getDB('actividades');
     const ests = getDB('establecimientos');
 
-    // KPIs
     const total = regs.length;
     const completadas = regs.filter(r => ['completado', 'validado'].includes(r.estado)).length;
     const pendientes = regs.filter(r => r.estado === 'pendiente').length;
@@ -352,7 +380,6 @@ const renderInspectorTable = () => {
     kpiPendientes.textContent = pendientes;
     kpiIncumplidas.textContent = rechazadas;
 
-    // Actualizar Gráfico
     const ctx = document.getElementById('statusChart').getContext('2d');
     if (chartInstance) chartInstance.destroy();
     chartInstance = new Chart(ctx, {
@@ -367,7 +394,6 @@ const renderInspectorTable = () => {
         options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
     });
 
-    // Filtros
     const searchVal = filterSearch.value.toLowerCase();
     const statusVal = filterStatus.value;
     const freqVal = filterFreq.value;
@@ -410,7 +436,6 @@ const renderInspectorTable = () => {
     }).join('');
 };
 
-// PDF
 function generatePDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
@@ -432,7 +457,7 @@ function generatePDF() {
             act ? act.nombre : '-',
             act ? act.frecuencia : '-',
             r.estado.toUpperCase(),
-            r.obs_inspector || '-' // Incluir observaciones en PDF
+            r.obs_inspector || '-'
         ]);
     });
 
@@ -465,7 +490,7 @@ const renderUI = () => {
             mesField.classList.toggle('d-none', !['mensual', 'semestral', 'anual'].includes(e.target.value));
         });
 
-        verificarSesionQR(); // Verifica si hay sesión QR activa
+        verificarSesionQR(); 
         renderTecnicoTareas();
     } else {
         inspectorPanel.classList.remove('d-none');
