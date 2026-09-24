@@ -22,7 +22,7 @@ const setDB = (key, data) => localStorage.setItem(key, JSON.stringify(data));
 let currentUser = null;
 let qrSession = null; 
 let chartInstance = null;
-let techTimerInterval = null; // Intervalo para el temporizador del técnico
+let techTimerInterval = null;
 
 // ==========================================
 // SESIÓN
@@ -42,7 +42,7 @@ const login = (e) => {
         currentUser = user;
         localStorage.setItem('sessionUser', JSON.stringify(user));
         
-        // TEMPORIZADOR TÉCNICO: Guardar hora de expiración (1 hora)
+        // TEMPORIZADOR TÉCNICO: 1 hora
         if (user.rol === 'tecnico') {
             localStorage.setItem('techSessionExpiry', Date.now() + (60 * 60 * 1000));
         }
@@ -57,12 +57,11 @@ const login = (e) => {
 const logout = () => {
     localStorage.removeItem('sessionUser');
     localStorage.removeItem('qrSession');
-    localStorage.removeItem('techSessionExpiry'); // Limpiar temporizador
+    localStorage.removeItem('techSessionExpiry');
     if(techTimerInterval) clearInterval(techTimerInterval);
     location.reload();
 };
 
-// Lógica del temporizador global del técnico
 const verificarTemporizadorTecnico = () => {
     const expiry = localStorage.getItem('techSessionExpiry');
     if (!expiry) return logout();
@@ -85,7 +84,6 @@ const verificarTemporizadorTecnico = () => {
 // ==========================================
 // INGENIERO - LÓGICA DE CONFIGURACIÓN
 // ==========================================
-
 const cargarDropdownTecnicos = () => {
     const tecnicos = getDB('usuarios').filter(u => u.rol === 'tecnico');
     const select = document.getElementById('estTech');
@@ -319,7 +317,6 @@ const generarRegistrosDelDia = () => {
 // ==========================================
 // TÉCNICO - LÓGICA DE EJECUCIÓN Y QR
 // ==========================================
-
 const verificarSesionQR = () => {
     const params = new URLSearchParams(window.location.search);
     const qrId = params.get('qr');
@@ -573,4 +570,106 @@ const renderInspectorTable = () => {
             <tr>
                 <td>${row.fecha_programada}</td>
                 <td>${row.establecimiento ? row.establecimiento.nombre : 'N/A'}</td>
-                <
+                <td>${row.actividad.nombre}<br><small class="text-muted">Ref: ${row.actividad.referencia || '-'}</small></td>
+                <td><small>${row.valor_medido || '-'}</small></td>
+                <td><small>${row.ejecutado_por || '-'}</small></td>
+                <td><span class="badge ${badgeClass}">${row.estado.toUpperCase()}</span></td>
+                <td><small class="text-danger">${row.obs_inspector || '-'}</small></td>
+                <td>
+                    ${row.estado === 'completado' ? `
+                        <button onclick="validarTarea(${row.id}, 'validado')" class="btn btn-sm btn-success"><i class="bi bi-check"></i></button>
+                        <button onclick="validarTarea(${row.id}, 'rechazado')" class="btn btn-sm btn-danger"><i class="bi bi-x"></i></button>
+                    ` : '-'}
+                </td>
+            </tr>`;
+    }).join('');
+};
+
+function generatePDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const regs = getDB('registros');
+    const acts = getDB('actividades');
+    const ests = getDB('establecimientos');
+
+    doc.setFontSize(20);
+    doc.setTextColor(0, 74, 152);
+    doc.text("Informe de Fiscalización - GAD", 14, 22);
+    
+    const tableData = [];
+    regs.forEach(r => {
+        const act = acts.find(a => a.id === r.actividad_id);
+        const est = act ? ests.find(e => e.id === act.establecimiento_id) : null;
+        tableData.push([
+            r.fecha_programada,
+            est ? est.nombre : '-',
+            act ? act.nombre : '-',
+            r.valor_medido || '-',
+            r.ejecutado_por || '-',
+            r.estado.toUpperCase(),
+            r.obs_inspector || '-'
+        ]);
+    });
+
+    doc.autoTable({
+        startY: 30,
+        head: [['Fecha', 'Lugar', 'Actividad', 'Medido', 'Técnico', 'Estado', 'Observaciones']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: { fillColor: [0, 74, 152] }
+    });
+
+    doc.save('Informe_GAD.pdf');
+}
+
+// ==========================================
+// RENDER PRINCIPAL
+// ==========================================
+const renderUI = () => {
+    loginScreen.classList.add('d-none');
+    
+    let navExtra = '';
+    if (currentUser.rol === 'tecnico') {
+        navExtra = `<span class="text-white me-3 badge bg-warning text-dark">Sesión: <b id="techTimer">59:59</b></span>`;
+    }
+    
+    navContent.innerHTML = `<span class="text-white me-3">Hola, <b>${currentUser.nombre}</b> (${currentUser.rol})</span>${navExtra}<button onclick="logout()" class="btn btn-outline-light btn-sm">Salir</button>`;
+
+    if (currentUser.rol === 'ingeniero') {
+        document.getElementById('ingenieroPanel').classList.remove('d-none');
+        cargarDropdownTecnicos();
+        document.getElementById('formEstablecimiento').addEventListener('submit', crearEstablecimiento);
+        document.getElementById('formEstructura').addEventListener('submit', crearEstructura);
+        document.getElementById('formActividad').addEventListener('submit', crearActividad);
+        document.getElementById('structEstSelect').addEventListener('change', renderListaEstructuras);
+        
+        document.getElementById('actFreq').addEventListener('change', (e) => {
+            mesField.classList.toggle('d-none', !['mensual', 'trimestral', 'semestral', 'anual'].includes(e.target.value));
+        });
+
+        actualizarSelectsIngeniero();
+    } 
+    else if (currentUser.rol === 'tecnico') {
+        document.getElementById('tecnicoPanel').classList.remove('d-none');
+        
+        // Iniciar temporizador de 1 hora
+        verificarTemporizadorTecnico();
+        techTimerInterval = setInterval(verificarTemporizadorTecnico, 1000);
+        
+        verificarSesionQR(); 
+        renderTecnicoTareas();
+    } 
+    else if (currentUser.rol === 'inspector') {
+        document.getElementById('inspectorPanel').classList.remove('d-none');
+        document.getElementById('filterSearch').addEventListener('keyup', renderInspectorTable);
+        document.getElementById('filterStatus').addEventListener('change', renderInspectorTable);
+        document.getElementById('filterFreq').addEventListener('change', renderInspectorTable);
+        renderInspectorTable();
+    }
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    initDB();
+    checkSession();
+    loginForm.addEventListener('submit', login);
+});
