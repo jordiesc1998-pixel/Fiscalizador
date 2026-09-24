@@ -111,12 +111,17 @@ const crearEstablecimiento = (e) => {
     document.querySelectorAll('.dia-check:checked').forEach(el => diasAtencion.push(parseInt(el.value)));
     if(diasAtencion.length === 0) { alert("Seleccione días de atención."); return; }
 
+    // Captura del PDF
+    const pdfInput = document.getElementById('estPlanPdf');
+    const pdfName = pdfInput.files.length > 0 ? pdfInput.files[0].name : 'Sin plan';
+
     ests.push({
         id: Date.now(),
         nombre: estName.value,
         direccion: estDir.value,
         propietario: estOwner.value,
         ci_ruc: estCi.value,
+        plan_pdf: pdfName, // Guardamos el PDF
         dias_atencion: diasAtencion,
         usuario_id: currentUser.id,
         usuario_nombre: currentUser.nombre
@@ -131,11 +136,16 @@ const crearEstructura = (e) => {
     e.preventDefault();
     const estId = parseInt(structEstSelect.value);
     const estructuras = getDB('estructuras');
+    
+    // Captura de la Foto
+    const fotoInput = document.getElementById('structPhoto');
+    const fotoName = fotoInput.files.length > 0 ? fotoInput.files[0].name : 'sin_foto.jpg';
+
     const newStruct = {
         id: Date.now(),
         establecimiento_id: estId,
         nombre: structName.value,
-        foto: 'sin_foto.jpg'
+        foto: fotoName // Guardamos la foto
     };
     estructuras.push(newStruct);
     setDB('estructuras', estructuras);
@@ -288,7 +298,7 @@ const generarRegistrosDelDia = () => {
 
         if (generar) {
             let targets = [];
-            const aplicaA = act.aplica_a || ['todos']; // PROTECCIÓN CONTRA ERRORES
+            const aplicaA = act.aplica_a || ['todos']; 
             if (aplicaA.includes('todos')) {
                 targets = estructurasDB.filter(e => e.establecimiento_id == act.establecimiento_id).map(e => e.id);
             } else {
@@ -305,7 +315,8 @@ const generarRegistrosDelDia = () => {
                         estado: 'pendiente',
                         evidencia: null,
                         obs_inspector: '',
-                        valor_medido: ''
+                        valor_medido: '',
+                        ejecutado_por: '' // NUEVO CAMPO
                     });
                 }
             });
@@ -314,6 +325,7 @@ const generarRegistrosDelDia = () => {
     setDB('registros', regs);
 };
 
+// MODIFICADO: Guardar quién ejecuta la tarea
 const marcarTareaRapida = (idReg) => {
     const valInput = document.getElementById(`val-${idReg}`);
     const valor = valInput ? valInput.value : '';
@@ -322,10 +334,12 @@ const marcarTareaRapida = (idReg) => {
     const reg = regs.find(r => r.id === idReg);
     reg.estado = 'completado';
     reg.valor_medido = valor;
+    reg.ejecutado_por = currentUser.nombre; // REGISTRO DE USUARIO
     setDB('registros', regs);
     renderTecnicoTareas();
 };
 
+// MODIFICADO: Guardar quién ejecuta la tarea
 const subirEvidencia = (idReg) => {
     const fileInput = document.getElementById(`file-${idReg}`);
     if (!fileInput || fileInput.files.length === 0) { alert("⚠️ Debe seleccionar un archivo."); return; }
@@ -338,6 +352,7 @@ const subirEvidencia = (idReg) => {
     reg.estado = 'completado';
     reg.evidencia = fileInput.files[0].name;
     reg.valor_medido = valor;
+    reg.ejecutado_por = currentUser.nombre; // REGISTRO DE USUARIO
     setDB('registros', regs);
     alert('✅ Evidencia subida.');
     renderTecnicoTareas();
@@ -508,6 +523,7 @@ const renderInspectorTable = () => {
         return true;
     });
 
+    // MODIFICADO: Añadida columna Realizada por
     tablaInspector.innerHTML = filteredData.map(row => {
         if(!row.actividad) return '';
         let badgeClass = 'badge-pendiente';
@@ -520,6 +536,7 @@ const renderInspectorTable = () => {
                 <td>${row.establecimiento ? row.establecimiento.nombre : 'N/A'}</td>
                 <td>${row.actividad.nombre}<br><small class="text-muted">Ref: ${row.actividad.referencia || '-'}</small></td>
                 <td><small>${row.valor_medido || '-'}</small></td>
+                <td><small>${row.ejecutado_por || '-'}</small></td>
                 <td><span class="badge ${badgeClass}">${row.estado.toUpperCase()}</span></td>
                 <td><small class="text-danger">${row.obs_inspector || '-'}</small></td>
                 <td>
@@ -532,6 +549,7 @@ const renderInspectorTable = () => {
     }).join('');
 };
 
+// MODIFICADO: Incluye técnico en el PDF
 function generatePDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
@@ -552,6 +570,7 @@ function generatePDF() {
             est ? est.nombre : '-',
             act ? act.nombre : '-',
             r.valor_medido || '-',
+            r.ejecutado_por || '-', // Técnico en PDF
             r.estado.toUpperCase(),
             r.obs_inspector || '-'
         ]);
@@ -559,7 +578,7 @@ function generatePDF() {
 
     doc.autoTable({
         startY: 30,
-        head: [['Fecha', 'Lugar', 'Actividad', 'Medido', 'Estado', 'Observaciones']],
+        head: [['Fecha', 'Lugar', 'Actividad', 'Medido', 'Técnico', 'Estado', 'Observaciones']],
         body: tableData,
         theme: 'grid',
         headStyles: { fillColor: [0, 74, 152] }
