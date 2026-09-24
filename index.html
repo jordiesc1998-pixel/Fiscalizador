@@ -104,12 +104,16 @@
                                     </div>
                                 </div>
 
-                                <!-- NUEVO FORMULARIO ACTIVIDADES -->
+                                <!-- FORMULARIO ACTIVIDADES CORREGIDO -->
                                 <div class="col-lg-6">
                                     <div class="card border-0 shadow-sm">
                                         <div class="card-header"><i class="bi bi-clipboard-check me-2"></i>3. Programar Actividad</div>
                                         <div class="card-body">
                                             <form id="formActividad">
+                                                <div class="mb-2">
+                                                    <label>Establecimiento</label>
+                                                    <select id="actEst" class="form-select" required></select>
+                                                </div>
                                                 <div class="mb-2"><label>Actividad</label><input type="text" id="actName" class="form-control" placeholder="Ej: Revisión de presión" required></div>
                                                 <div class="mb-2"><label>Operación</label><textarea id="actOperacion" class="form-control" rows="2" placeholder="Qué debe hacer el técnico"></textarea></div>
                                                 <div class="mb-2"><label>Referencia</label><input type="text" id="actReferencia" class="form-control" placeholder="Ej: 40 PSI"></div>
